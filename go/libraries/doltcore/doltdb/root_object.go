@@ -1,4 +1,4 @@
-// Copyright 2024 Dolthub, Inc.
+// Copyright 2025 Dolthub, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,9 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// dolt is the command line tool for working with Dolt databases.
-package doltversion
+package doltdb
 
-const (
-	Version = "1.51.1"
+import (
+	"context"
+
+	"github.com/dolthub/dolt/go/store/hash"
 )
+
+// RootObject is an object that is located on the root, rather than inside another object (table, schema, etc.). This is
+// primarily used by Doltgres to store root-level objects (sequences, functions, etc.).
+type RootObject interface {
+	// HashOf returns the hash of the underlying struct.
+	HashOf(ctx context.Context) (hash.Hash, error)
+	// Name returns the name of the custom table.
+	Name() TableName
+}
