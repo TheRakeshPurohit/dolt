@@ -200,7 +200,7 @@ func (rcv *TableSchema) AdaptiveEncodingMaxRowSize() uint32 {
 	if o != 0 {
 		return rcv._tab.GetUint32(o + rcv._tab.Pos)
 	}
-	return 0
+	return 2048
 }
 
 func (rcv *TableSchema) MutateAdaptiveEncodingMaxRowSize(n uint32) bool {
@@ -243,7 +243,7 @@ func TableSchemaAddComment(builder *flatbuffers.Builder, comment flatbuffers.UOf
 	builder.PrependUOffsetTSlot(6, flatbuffers.UOffsetT(comment), 0)
 }
 func TableSchemaAddAdaptiveEncodingMaxRowSize(builder *flatbuffers.Builder, adaptiveEncodingMaxRowSize uint32) {
-	builder.PrependUint32Slot(7, adaptiveEncodingMaxRowSize, 0)
+	builder.PrependUint32Slot(7, adaptiveEncodingMaxRowSize, 2048)
 }
 func TableSchemaEnd(builder *flatbuffers.Builder) flatbuffers.UOffsetT {
 	return builder.EndObject()

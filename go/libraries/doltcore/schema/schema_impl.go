@@ -303,9 +303,6 @@ func (si *schemaImpl) SetComment(comment string) {
 }
 
 func (si *schemaImpl) GetAdaptiveEncodingMaxRowSize() uint32 {
-	if si.adaptiveEncodingMaxRowSize == 0 {
-		return 2048
-	}
 	return si.adaptiveEncodingMaxRowSize
 }
 
