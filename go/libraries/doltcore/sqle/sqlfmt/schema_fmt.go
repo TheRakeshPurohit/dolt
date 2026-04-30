@@ -182,10 +182,10 @@ func generateNonCreateNonDropTableSqlSchemaDiff(ctx *sql.Context, formatter sql.
 	}
 
 	// Handle adaptive encoding max row size changes
-	toAEMRS := toSch.GetAdaptiveEncodingMaxRowSize()
-	fromAEMRS := fromSch.GetAdaptiveEncodingMaxRowSize()
-	if toAEMRS != fromAEMRS {
-		ddlStatements = append(ddlStatements, fmt.Sprintf("ALTER TABLE %s ADAPTIVE_ENCODING_MAX_ROW_SIZE=%d;", formatter.QuoteIdentifier(td.ToName.Name), toAEMRS))
+	toTargetRowSize := toSch.GetTargetRowSize()
+	fromTargetRowSize := fromSch.GetTargetRowSize()
+	if toTargetRowSize != fromTargetRowSize {
+		ddlStatements = append(ddlStatements, fmt.Sprintf("ALTER TABLE %s TARGET_ROW_SIZE=%d;", formatter.QuoteIdentifier(td.ToName.Name), toTargetRowSize))
 	}
 
 	return ddlStatements, nil

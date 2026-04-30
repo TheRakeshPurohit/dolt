@@ -124,7 +124,7 @@ func updateColumnTag(sch schema.Schema, name string, tag uint64) (schema.Schema,
 		return nil, err
 	}
 	newSch.SetCollation(sch.GetCollation())
-	newSch.SetAdaptiveEncodingMaxRowSize(sch.GetAdaptiveEncodingMaxRowSize())
+	newSch.SetTargetRowSize(sch.GetTargetRowSize())
 
 	return newSch, nil
 }

@@ -19,6 +19,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/dolthub/dolt/go/store/val"
 	"io"
 	"math"
 	"os"
@@ -1506,7 +1507,7 @@ type doltAlterableTableInterface interface {
 	sql.ProjectedTable
 	sql.CollationAlterableTable
 	sql.CommentAlterableTable
-	sql.AdaptiveEncodingMaxRowSizeAlterableTable
+	sql.TargetRowSizeAlterableTable
 	fulltext.IndexAlterableTable
 }
 
@@ -3083,14 +3084,26 @@ func (t *AlterableDoltTable) ModifyComment(ctx *sql.Context, comment string) err
 	return t.updateFromSchema(ctx, root, sch)
 }
 
-// ModifyAdaptiveEncodingMaxRowSize implements sql.AdaptiveEncodingMaxRowSizeAlterableTable
-func (t *AlterableDoltTable) ModifyAdaptiveEncodingMaxRowSize(ctx *sql.Context, value uint64) error {
+// HasTargetRowSize implements sql.TargetRowSizeTable
+func (t *AlterableDoltTable) HasTargetRowSize() bool {
+	return t.sch.GetTargetRowSize() != val.DefaultTupleLengthTarget
+}
+
+// GetTargetRowSize implements sql.TargetRowSizeTable
+func (t *AlterableDoltTable) GetTargetRowSize() uint64 {
+	return uint64(t.sch.GetTargetRowSize())
+}
+
+// ModifyTargetRowSize implements sql.TargetRowSizeAlterableTable
+func (t *AlterableDoltTable) ModifyTargetRowSize(ctx *sql.Context, value uint64) error {
+	if value > uint64(math.MaxUint16) {
+		return fmt.Errorf("target_row_size %d exceeds maximum allowed value %d", value, uint64(math.MaxUint16))
+	}
 	root, sch, err := t.getWritableSchema(ctx)
 	if err != nil {
 		return err
 	}
-
-	sch.SetAdaptiveEncodingMaxRowSize(uint32(value))
+	sch.SetTargetRowSize(uint16(value))
 
 	return t.updateFromSchema(ctx, root, sch)
 }

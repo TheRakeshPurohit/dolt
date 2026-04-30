@@ -96,12 +96,12 @@ type Schema interface {
 	// SetComment sets the table's comment.
 	SetComment(comment string)
 
-	// GetAdaptiveEncodingMaxRowSize returns the table's adaptive encoding max row size.
-	// Returns 2048 if not explicitly set.
-	GetAdaptiveEncodingMaxRowSize() uint32
+	// GetTargetRowSize returns the table's target row size in bytes.
+	// Returns the default (2048) if not explicitly set.
+	GetTargetRowSize() uint16
 
-	// SetAdaptiveEncodingMaxRowSize sets the table's adaptive encoding max row size.
-	SetAdaptiveEncodingMaxRowSize(value uint32)
+	// SetTargetRowSize sets the table's target row size.
+	SetTargetRowSize(value uint16)
 
 	// Copy returns a copy of this Schema that can be safely modified independently.
 	Copy() Schema
@@ -200,7 +200,7 @@ func SchemasAreEqual(sch1, sch2 Schema) bool {
 		return false
 	}
 
-	if sch1.GetAdaptiveEncodingMaxRowSize() != sch2.GetAdaptiveEncodingMaxRowSize() {
+	if sch1.GetTargetRowSize() != sch2.GetTargetRowSize() {
 		return false
 	}
 

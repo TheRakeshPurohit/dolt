@@ -84,6 +84,12 @@ func NewTupleBuilder(desc *TupleDesc, vs ValueStore) *TupleBuilder {
 	}
 }
 
+func (tb *TupleBuilder) WithMaxRowSize(target uint16) *TupleBuilder {
+	other := *tb
+	other.tupleLengthTarget = target
+	return &other
+}
+
 // Build materializes a Tuple from the fields written to the TupleBuilder.
 func (tb *TupleBuilder) Build(pool pool.BuffPool) (tup Tuple, err error) {
 	for i, typ := range tb.Desc.Types {

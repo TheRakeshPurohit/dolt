@@ -35,7 +35,8 @@ table TableSchema {
   // table comment
   comment:string;
 
-  adaptive_encoding_max_row_size:uint32 = 2048;
+  // target row size (used with adaptive encoded columns)
+  target_row_size:uint16 = 2048;
 }
 
 table Column {
