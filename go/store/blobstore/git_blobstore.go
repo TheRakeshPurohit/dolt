@@ -802,7 +802,7 @@ const infoBranchFileName = "DOLT_REMOTE.md"
 
 func formatDoltRemoteInfo(remoteRef string, headOID git.OID, ts time.Time) []byte {
 	return []byte(fmt.Sprintf(
-		"This repository is being used as a Dolt remote.\n\nref=%s\nhead=%s\ntimestamp=%s\n",
+		"This repository is being used as a Dolt remote.\n\nref=%s\n\nhead=%s\n\ntimestamp=%s\n",
 		remoteRef, headOID, ts.UTC().Format(time.RFC3339),
 	))
 }
