@@ -375,6 +375,11 @@ func getCommitMessageFromEditor(sqlCtx *sql.Context, queryist cli.Queryist, sugg
 }
 
 func checkIsTerminal() bool {
+	// In tests that drive cli commands without InitIO the stdio swap helper is unset, so
+	// treat the absence as a non-terminal context to avoid dereferencing a nil function.
+	if cli.ExecuteWithStdioRestored == nil {
+		return false
+	}
 	isTerminal := false
 	cli.ExecuteWithStdioRestored(func() {
 		fd := os.Stdout.Fd()

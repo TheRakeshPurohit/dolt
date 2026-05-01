@@ -10,7 +10,8 @@ setup() {
   bats_load_library windows-compat.bash
   bats_load_library query-server-common.bash
   bats_load_library common.bash
-  bats_load_library server.bash
+  bats_load_library compat-common.bash
+  bats_load_library compat-server.bash
 
   # Each test runs in a fresh tmpdir so state never leaks between tests or passes.
   mkdir -p "$BATS_TEST_TMPDIR/repo"

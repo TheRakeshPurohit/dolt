@@ -318,8 +318,8 @@ func logCommits(apr *argparser.ArgParseResults, commitHashes []sql.Row, queryist
 	return logToStdOut(apr, commitsInfo, sqlCtx, queryist, decoration)
 }
 
-// resolveDecorateAuto resolves the auto decoration value to short when stdout is a terminal
-// and no otherwise. Other values pass through unchanged.
+// resolveDecorateAuto returns short when stdout is a terminal and no
+// otherwise. Other |decorate| values pass through unchanged.
 func resolveDecorateAuto(decorate string) string {
 	if decorate != "auto" {
 		return decorate

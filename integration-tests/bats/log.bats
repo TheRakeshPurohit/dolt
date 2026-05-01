@@ -775,9 +775,11 @@ export NO_COLOR=1
     dolt tag commit1
     dolt commit --allow-empty -m "commit 2"
     dolt tag commit2
-    run dolt log commit1
+    # Pin --decorate=short because run captures stdout without a tty, which would otherwise
+    # resolve --decorate=auto to no and hide the HEAD decoration the test asserts on.
+    run dolt log --decorate=short commit1
     [[ ! "$output" =~ "HEAD" ]] || false
-    run dolt log commit2
+    run dolt log --decorate=short commit2
     [[ "$output" =~ "HEAD" ]] || false
 }
 
