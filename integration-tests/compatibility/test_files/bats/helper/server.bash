@@ -56,30 +56,44 @@ stop_old_sql_server() {
   fi
 }
 
-# skip_if_new_lt skips the current test when new_dolt is older than min_version.
-skip_if_new_lt() {
-  local min_version="$1"
+# is_dev_build returns 0 when the binary path matches DOLT_DEV_BUILD_PATH, which the runner
+# exports for the freshly-built dolt so version-literal compares do not skip the dev build.
+is_dev_build() {
+  [ -n "${DOLT_DEV_BUILD_PATH:-}" ] && [ "$1" = "$DOLT_DEV_BUILD_PATH" ]
+}
+
+# skip_if_new_lte skips when new_dolt is at or below max_version. The dev build is exempt
+# only when its reported version is already at or above max_version.
+skip_if_new_lte() {
+  local max_version="$1"
   local reason="$2"
   local new_version
   new_version=$(new_dolt version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
   if [ -z "$new_version" ]; then
     return 0
   fi
-  if [ "$(printf '%s\n' "$new_version" "$min_version" | sort -V | head -n1)" != "$min_version" ]; then
+  if is_dev_build "${DOLT_NEW_BIN:-}" && [ "$(printf '%s\n' "$new_version" "$max_version" | sort -V | head -n1)" = "$max_version" ]; then
+    return 0
+  fi
+  if [ "$(printf '%s\n' "$max_version" "$new_version" | sort -V | head -n1)" = "$new_version" ]; then
     skip "$reason (new_dolt version: $new_version)"
   fi
 }
 
-# skip_if_old_lt skips the current test when old_dolt is older than min_version.
-skip_if_old_lt() {
-  local min_version="$1"
+# skip_if_old_lte skips when old_dolt is at or below max_version. The dev build is exempt
+# only when its reported version is already at or above max_version.
+skip_if_old_lte() {
+  local max_version="$1"
   local reason="$2"
   local old_version
   old_version=$(old_dolt version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)
   if [ -z "$old_version" ]; then
     return 0
   fi
-  if [ "$(printf '%s\n' "$old_version" "$min_version" | sort -V | head -n1)" != "$min_version" ]; then
+  if is_dev_build "${DOLT_OLD_BIN:-}" && [ "$(printf '%s\n' "$old_version" "$max_version" | sort -V | head -n1)" = "$max_version" ]; then
+    return 0
+  fi
+  if [ "$(printf '%s\n' "$max_version" "$old_version" | sort -V | head -n1)" = "$old_version" ]; then
     skip "$reason (old_dolt version: $old_version)"
   fi
 }

@@ -112,4 +112,3 @@ const (
 	ReverseFlag  = "reverse"
 	FormatFlag   = "result-format"
 )
-

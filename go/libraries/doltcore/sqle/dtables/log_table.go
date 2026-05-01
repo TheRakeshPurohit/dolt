@@ -510,4 +510,3 @@ func GetCommitHashToRefs(ctx *sql.Context, ddb *doltdb.DoltDB, decoration string
 
 	return cHashToRefs, nil
 }
-
