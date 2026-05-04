@@ -20,7 +20,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
@@ -1552,41 +1551,93 @@ func TestUnwrapToBytes_JSONWrappers(t *testing.T) {
 	})
 }
 
-// TestJsonSerializer_AdaptiveEncoding_SizeSweep checks that the JSON serializer produces
-// the correct binlog wire bytes across a range of document sizes that exercise both the
-// inline/out-of-band boundary in adaptive storage (~2 KiB) and the small-format/large-format
-// boundary in MySQL's JSON wire encoding (~64 KiB), in addition to small documents and
-// documents that comfortably exceed both thresholds.
-func TestJsonSerializer_AdaptiveEncoding_SizeSweep(t *testing.T) {
+// TestJsonSerializer_AdaptiveEncoding_DocumentShapes round-trips a variety of JSON
+// document shapes — objects with many keys, arrays with many elements, nested mixtures,
+// and documents spanning the inline/out-of-band Dolt storage boundary (~2 KiB) plus the
+// MySQL small-format/large-format wire boundary (~64 KiB encoded). Each shape produces
+// many small leaf values so the resulting MySQL wire encoding actually has a long
+// value-entries section with non-trivial offsets, rather than collapsing to a single
+// huge inline string. For every case we compare the serializer's wire bytes against an
+// independent encodeJsonDoc reference run on a freshly-parsed copy of the source bytes.
+func TestJsonSerializer_AdaptiveEncoding_DocumentShapes(t *testing.T) {
 	s := jsonSerializer{}
 	typ := gmstypes.JSON
 	ctx := context.Background()
 
-	// MySQL's JSON encoding switches from 16-bit to 32-bit offsets at 64 KiB. The single-key
-	// object {"k":"<filler>"} carries roughly 17 bytes of overhead (key entry + value entry +
-	// type id + count/size fields), so this filler-length range straddles that boundary along
-	// with the adaptive inline/out-of-band boundary at 2 KiB.
+	// Per-element wire overhead estimate (key entry + value entry + ~3-byte key + 8-byte
+	// double): ~17 bytes/element in small object encoding. So 5000 keys ≈ 85 KiB encoded,
+	// comfortably past the 64 KiB small/large boundary.
 	cases := []struct {
-		name        string
-		fillerBytes int
+		name     string
+		buildDoc func() string
 	}{
-		{"small_inline", 8},                  // tiny — comfortably inline
-		{"medium_inline", 1024},              // close to inline threshold but under
-		{"just_over_inline", 4096},           // out-of-band, single chunk
-		{"medium_out_of_band", 16 * 1024},    // out-of-band, single chunk
-		{"under_64k_boundary", 60 * 1024},    // out-of-band, still small JSON encoding
-		{"over_64k_boundary", 70 * 1024},     // out-of-band, large JSON encoding
-		{"well_over_64k", 256 * 1024},        // out-of-band, multi-chunk blob
+		{
+			name: "object_few_keys_inline_storage",
+			buildDoc: func() string {
+				return buildJsonObject(t, 8)
+			},
+		},
+		{
+			name: "object_many_keys_inline_storage_under_2k",
+			buildDoc: func() string {
+				return buildJsonObject(t, 50)
+			},
+		},
+		{
+			name: "object_many_keys_out_of_band_small_wire",
+			buildDoc: func() string {
+				// Out-of-band in Dolt (>2 KiB raw), still small-format wire (<64 KiB encoded).
+				return buildJsonObject(t, 1000)
+			},
+		},
+		{
+			name: "object_many_keys_crosses_64k_wire_boundary",
+			buildDoc: func() string {
+				// Forces the wire encoding from small (16-bit offsets) to large (32-bit).
+				return buildJsonObject(t, 5000)
+			},
+		},
+		{
+			name: "array_few_elements",
+			buildDoc: func() string {
+				return buildJsonArray(t, 8)
+			},
+		},
+		{
+			name: "array_many_elements_out_of_band",
+			buildDoc: func() string {
+				return buildJsonArray(t, 2000)
+			},
+		},
+		{
+			name: "array_many_elements_crosses_64k_wire_boundary",
+			buildDoc: func() string {
+				// Per-element wire overhead in a small array is ~3 bytes value-entry plus
+				// ~5 bytes value, so ~9000 mixed-leaf elements is needed to exceed 64 KiB.
+				return buildJsonArray(t, 12000)
+			},
+		},
+		{
+			name: "mixed_nested_object_with_arrays",
+			buildDoc: func() string {
+				return buildNestedJson(t, 200, 30)
+			},
+		},
+		{
+			name: "mixed_nested_crosses_64k_wire_boundary",
+			buildDoc: func() string {
+				return buildNestedJson(t, 1500, 50)
+			},
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			filler := strings.Repeat("a", tc.fillerBytes)
-			jsonBytes := []byte(`{"k":"` + filler + `"}`)
+			docStr := tc.buildDoc()
+			jsonBytes := []byte(docStr)
 
-			// Reference encoding: feed the JSON straight through encodeJsonDoc on a plain
-			// JSONDocument value. This is what the serializer should produce regardless of
-			// how the value is laid out in storage.
+			// Reference: parse and encode independently — this is the wire output the
+			// production serializer must produce regardless of storage layout.
 			var refDoc interface{}
 			require.NoError(t, json.Unmarshal(jsonBytes, &refDoc))
 			refJsonBuf, err := encodeJsonDoc(ctx, gmstypes.JSONDocument{Val: refDoc})
@@ -1596,8 +1647,7 @@ func TestJsonSerializer_AdaptiveEncoding_SizeSweep(t *testing.T) {
 			expectedWire := append(append([]byte{}, refLength...), refJsonBuf...)
 
 			tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.JsonAdaptiveEnc)
-			// PutAdaptiveJsonFromInline routes large values out-of-band automatically, so
-			// this single entry point exercises both inline and out-of-band storage.
+			// Routes inline or out-of-band automatically based on the raw byte length.
 			require.NoError(t, tupleBuilder.PutAdaptiveJsonFromInline(ctx, 0, jsonBytes))
 			tuple, err := tupleBuilder.Build(ctx, buffPool)
 			require.NoError(t, err)
@@ -1609,9 +1659,99 @@ func TestJsonSerializer_AdaptiveEncoding_SizeSweep(t *testing.T) {
 			gotWire, err := s.serialize(ctx, typ, value, ns)
 			require.NoError(t, err)
 			require.Equal(t, expectedWire, gotWire,
-				"wire format mismatch for fillerBytes=%d (total json bytes=%d)",
-				tc.fillerBytes, len(jsonBytes))
+				"wire format mismatch for %s (raw json bytes=%d, encoded body bytes=%d)",
+				tc.name, len(jsonBytes), len(refJsonBuf))
+
+			// Sanity-check that the boundary-crossing cases really do cross. The wire
+			// body's first byte after the 4-byte length prefix is the JSON type id.
+			// Small object/array ids are 0x00/0x02; large ones are 0x01/0x03.
+			rootTypeId := gotWire[4]
+			switch tc.name {
+			case "object_many_keys_crosses_64k_wire_boundary":
+				require.Equalf(t, byte(0x01), rootTypeId,
+					"expected large object type id (0x01) for %s, got 0x%02x; encoded body size=%d",
+					tc.name, rootTypeId, len(refJsonBuf))
+			case "array_many_elements_crosses_64k_wire_boundary":
+				require.Equalf(t, byte(0x03), rootTypeId,
+					"expected large array type id (0x03) for %s, got 0x%02x; encoded body size=%d",
+					tc.name, rootTypeId, len(refJsonBuf))
+			case "object_many_keys_out_of_band_small_wire":
+				require.Equalf(t, byte(0x00), rootTypeId,
+					"expected small object type id (0x00) for %s, got 0x%02x; encoded body size=%d",
+					tc.name, rootTypeId, len(refJsonBuf))
+			}
 		})
+	}
+}
+
+// buildJsonObject returns the JSON text of an object with |n| keys. Each value is a
+// distinct small leaf type so the encoded value-entries section is genuinely populated
+// with mixed type IDs (numbers, strings, booleans, null).
+func buildJsonObject(t *testing.T, n int) string {
+	t.Helper()
+	obj := make(map[string]interface{}, n)
+	for i := 0; i < n; i++ {
+		obj[fmt.Sprintf("k%06d", i)] = jsonLeafValue(i)
+	}
+	buf, err := json.Marshal(obj)
+	require.NoError(t, err)
+	return string(buf)
+}
+
+// buildJsonArray returns the JSON text of an array with |n| elements, again mixing leaf
+// types so every value-entry slot carries non-trivial data.
+func buildJsonArray(t *testing.T, n int) string {
+	t.Helper()
+	arr := make([]interface{}, n)
+	for i := 0; i < n; i++ {
+		arr[i] = jsonLeafValue(i)
+	}
+	buf, err := json.Marshal(arr)
+	require.NoError(t, err)
+	return string(buf)
+}
+
+// buildNestedJson returns a JSON object that contains both a long array and a sub-object
+// with many keys, so the encoder has to handle nested small/large decisions and the
+// outer object's offsets point at non-trivial sub-encodings.
+func buildNestedJson(t *testing.T, arrayLen, subObjectKeys int) string {
+	t.Helper()
+	subObj := make(map[string]interface{}, subObjectKeys)
+	for i := 0; i < subObjectKeys; i++ {
+		subObj[fmt.Sprintf("nested_key_%04d", i)] = jsonLeafValue(i * 7)
+	}
+	arr := make([]interface{}, arrayLen)
+	for i := 0; i < arrayLen; i++ {
+		arr[i] = jsonLeafValue(i)
+	}
+	root := map[string]interface{}{
+		"meta": map[string]interface{}{
+			"version": 3,
+			"label":   "test",
+			"flags":   []interface{}{true, false, nil},
+		},
+		"items":  arr,
+		"detail": subObj,
+	}
+	buf, err := json.Marshal(root)
+	require.NoError(t, err)
+	return string(buf)
+}
+
+// jsonLeafValue returns a small leaf value that varies by index so encoded value-entries
+// span MySQL's distinct JSON type ids: numbers (double), strings, booleans, and null.
+func jsonLeafValue(i int) interface{} {
+	switch i % 5 {
+	case 0:
+		return float64(i)
+	case 1:
+		return fmt.Sprintf("v_%d", i)
+	case 2:
+		return i%2 == 0
+	case 3:
+		return nil
+	default:
+		return float64(i) * 0.5
 	}
 }
 
