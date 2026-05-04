@@ -1802,6 +1802,160 @@ func TestGeometrySerializer_AdaptiveEncoding(t *testing.T) {
 	})
 }
 
+// TestGeometrySerializer_AdaptiveEncoding_LargeValues round-trips real GeometryValue
+// objects (LineStrings with many points, Polygons with many rings) through the natural
+// PutAdaptiveGeomFromInline routing. Small values land inline; values larger than the
+// adaptive tuple-length target are automatically promoted to out-of-band storage,
+// returning *val.GeometryStorage from tree.GetField. The serializer must handle both
+// shapes; this test exercises both, as well as multi-chunk blob storage for very large
+// values (>~chunk size, so the underlying blob spans multiple prolly-tree leaves).
+func TestGeometrySerializer_AdaptiveEncoding_LargeValues(t *testing.T) {
+	s := geometrySerializer{}
+	typ := typeinfo.GeometryType.ToSqlType()
+	ctx := context.Background()
+
+	cases := []struct {
+		name              string
+		buildGeo          func() gmstypes.GeometryValue
+		expectOutOfBand   bool
+		expectStorageType interface{} // *val.GeometryStorage when out-of-band, else types.GeometryValue
+	}{
+		{
+			// Single Point → 25 bytes serialized → comfortably inline. Smallest geometry
+			// shape; sanity-checks that small values keep working through the new path.
+			name:              "small_point_inline",
+			buildGeo:          func() gmstypes.GeometryValue { return gmstypes.Point{SRID: 0, X: 1.0, Y: -1.0} },
+			expectOutOfBand:   false,
+			expectStorageType: gmstypes.Point{},
+		},
+		{
+			// 50 points → 813 bytes serialized → still inline (under 2 KiB target).
+			name:              "medium_linestring_inline",
+			buildGeo:          func() gmstypes.GeometryValue { return makeLineString(t, 50) },
+			expectOutOfBand:   false,
+			expectStorageType: gmstypes.LineString{},
+		},
+		{
+			// 200 points → 3213 bytes serialized → just over the inline threshold,
+			// promoted to out-of-band single-chunk storage. Exercises GeometryStorage
+			// round-trip on the smallest possible out-of-band geometry.
+			name:              "linestring_just_over_inline",
+			buildGeo:          func() gmstypes.GeometryValue { return makeLineString(t, 200) },
+			expectOutOfBand:   true,
+			expectStorageType: &val.GeometryStorage{},
+		},
+		{
+			// 10000 points → ~160 KiB serialized → out-of-band, stored as a multi-chunk
+			// blob in the prolly tree (the BlobBuilder chunks at ~64 KiB).
+			name:              "linestring_large_multi_chunk",
+			buildGeo:          func() gmstypes.GeometryValue { return makeLineString(t, 10000) },
+			expectOutOfBand:   true,
+			expectStorageType: &val.GeometryStorage{},
+		},
+		{
+			// Polygon with one outer ring and many inner rings (holes), each a small
+			// rectangle. 500 rings → ~40 KiB serialized → out-of-band, single chunk.
+			// Confirms the serializer handles non-LineString shapes through the
+			// out-of-band path too.
+			name:              "polygon_many_rings_out_of_band",
+			buildGeo:          func() gmstypes.GeometryValue { return makePolygon(t, 500) },
+			expectOutOfBand:   true,
+			expectStorageType: &val.GeometryStorage{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			geo := tc.buildGeo()
+			rawSerialized := geo.Serialize()
+
+			expectedWireLength := make([]byte, 4)
+			binary.LittleEndian.PutUint32(expectedWireLength, uint32(len(rawSerialized)))
+			expectedWire := append(append([]byte{}, expectedWireLength...), rawSerialized...)
+
+			// Use tree.PutField — the production path — which calls
+			// PutAdaptiveGeomFromInline and lets the tuple builder decide inline
+			// vs. out-of-band based on size. This is what real writes go through.
+			tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.GeomAdaptiveEnc)
+			require.NoError(t, tree.PutField(ctx, ns, tupleBuilder, 0, geo))
+			tuple, err := tupleBuilder.Build(ctx, buffPool)
+			require.NoError(t, err)
+
+			// Confirm the value actually landed where the test expects: out-of-band
+			// values come back from tree.GetField as *val.GeometryStorage; inline ones
+			// come back already deserialized into a concrete GeometryValue.
+			deserialized, err := tree.GetField(ctx, tupleDesc, 0, tuple, ns)
+			require.NoError(t, err)
+			require.NotNil(t, deserialized)
+			if tc.expectOutOfBand {
+				_, isStorage := deserialized.(*val.GeometryStorage)
+				require.Truef(t, isStorage,
+					"%s: expected *val.GeometryStorage from out-of-band path, got %T (serialized geo bytes=%d)",
+					tc.name, deserialized, len(rawSerialized))
+			} else {
+				_, isStorage := deserialized.(*val.GeometryStorage)
+				require.Falsef(t, isStorage,
+					"%s: expected inline GeometryValue, got *val.GeometryStorage (serialized geo bytes=%d)",
+					tc.name, len(rawSerialized))
+			}
+
+			// Now drive the same path the binlog producer does: serializer.deserialize
+			// → serializer.serialize → wire bytes.
+			value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+			require.NoError(t, err)
+			require.NotNil(t, value)
+
+			gotWire, err := s.serialize(ctx, typ, value, ns)
+			require.NoError(t, err)
+			require.Equal(t, expectedWire, gotWire,
+				"%s: wire format mismatch (serialized geo bytes=%d)", tc.name, len(rawSerialized))
+		})
+	}
+}
+
+// makeLineString builds a LineString with |n| points lying on a simple curve so each
+// point's bytes differ; this avoids any chance the storage layer or test framework
+// short-circuits identical inputs.
+func makeLineString(t *testing.T, n int) gmstypes.LineString {
+	t.Helper()
+	require.Greater(t, n, 0)
+	points := make([]gmstypes.Point, n)
+	for i := 0; i < n; i++ {
+		points[i] = gmstypes.Point{
+			SRID: 0,
+			X:    float64(i) * 0.001,
+			Y:    float64(i) * -0.002,
+		}
+	}
+	return gmstypes.LineString{SRID: 0, Points: points}
+}
+
+// makePolygon builds a Polygon with one outer ring (square) and |innerRings| inner
+// rings (square holes), each a closed ring of 5 points. innerRings of 0 still yields
+// a valid Polygon with just the outer ring.
+func makePolygon(t *testing.T, innerRings int) gmstypes.Polygon {
+	t.Helper()
+	closedRing := func(originX, originY, side float64) gmstypes.LineString {
+		return gmstypes.LineString{
+			SRID: 0,
+			Points: []gmstypes.Point{
+				{X: originX, Y: originY},
+				{X: originX + side, Y: originY},
+				{X: originX + side, Y: originY + side},
+				{X: originX, Y: originY + side},
+				{X: originX, Y: originY}, // close
+			},
+		}
+	}
+	rings := make([]gmstypes.LineString, 0, innerRings+1)
+	rings = append(rings, closedRing(0, 0, 1000)) // big outer square
+	for i := 0; i < innerRings; i++ {
+		// non-overlapping unit squares scattered inside the outer square
+		rings = append(rings, closedRing(float64(i%30), float64(i/30), 0.1))
+	}
+	return gmstypes.Polygon{SRID: 0, Lines: rings}
+}
+
 func createTestStringSlice(length int) []string {
 	result := make([]string, length)
 	for i := 0; i < length; i++ {
