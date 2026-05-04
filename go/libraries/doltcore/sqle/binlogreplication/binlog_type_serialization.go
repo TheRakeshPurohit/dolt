@@ -427,7 +427,7 @@ func (d decimalSerializer) serialize(ctx context.Context, typ sql.Type, value in
 	numLeftoverFractionalDigits := scale - numFractionalDigitUint32s*9
 
 	length := numFullDigitUint32s*4 + digitsToBytes[numLeftoverFullDigits] +
-			numFractionalDigitUint32s*4 + digitsToBytes[numLeftoverFractionalDigits]
+		numFractionalDigitUint32s*4 + digitsToBytes[numLeftoverFractionalDigits]
 
 	// Ensure the exponent is negative
 	if decimalValue.Exponent() > 0 {
@@ -614,8 +614,8 @@ func (d dateSerializer) serialize(ctx context.Context, typ sql.Type, value inter
 
 	ymd := uint32(
 		dateValue.Year())<<9 |
-			uint32(dateValue.Month())<<5 |
-			uint32(dateValue.Day())
+		uint32(dateValue.Month())<<5 |
+		uint32(dateValue.Day())
 	temp := make([]byte, 4)
 	binary.LittleEndian.PutUint32(temp, ymd)
 	data = append(data, temp[:3]...)
