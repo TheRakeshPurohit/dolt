@@ -17,7 +17,10 @@ package binlogreplication
 import (
 	bytes2 "bytes"
 	"context"
+	"encoding/binary"
+	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -1496,6 +1499,120 @@ func TestJsonSerializer_AdaptiveEncoding(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, expectedWire, bytes)
 	})
+}
+
+// TestUnwrapToBytes_JSONWrappers checks that unwrapToBytes — used by the TEXT and BLOB
+// serializers — correctly handles JSON wrapper values that come out of tree.GetField.
+// This matters for schema-change replication, where a column that was JSON in the source
+// schema may be serialized through a TEXT/BLOB target serializer, producing a JSON wrapper
+// value where the serializer expects byte-shaped data.
+func TestUnwrapToBytes_JSONWrappers(t *testing.T) {
+	ctx := context.Background()
+	jsonBytes := []byte(`{"a":"b"}`)
+
+	t.Run("LazyJSONDocument (inline JSON)", func(t *testing.T) {
+		// Build an inline-stored JSON tuple, deserialize through tree.GetField directly to
+		// get back a LazyJSONDocument, and pass that to unwrapToBytes for a TEXT type.
+		_, tupleBuilder, ns := newAdaptiveBuilder(val.JsonAdaptiveEnc)
+		require.NoError(t, tupleBuilder.PutAdaptiveJsonFromInline(ctx, 0, jsonBytes))
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		td := val.NewTupleDescriptor(val.Type{Enc: val.JsonAdaptiveEnc})
+		value, err := tree.GetField(ctx, td, 0, tuple, ns)
+		require.NoError(t, err)
+		_, isJsonWrapper := value.(sql.JSONWrapper)
+		require.True(t, isJsonWrapper, "expected sql.JSONWrapper, got %T", value)
+
+		out, err := unwrapToBytes(ctx, value, gmstypes.LongText, ns)
+		require.NoError(t, err)
+		require.Equal(t, jsonBytes, out)
+	})
+
+	t.Run("IndexedJsonDocument (out-of-band JSON)", func(t *testing.T) {
+		// Force out-of-band storage by writing a JSON blob and putting it as an outline,
+		// so tree.GetField returns an IndexedJsonDocument.
+		_, tupleBuilder, ns := newAdaptiveBuilder(val.JsonAdaptiveEnc)
+		addr, err := ns.WriteBytes(ctx, jsonBytes)
+		require.NoError(t, err)
+		js := val.NewJsonStorageOutOfBand(addr, ns, int64(len(jsonBytes)))
+		tupleBuilder.PutAdaptiveJsonFromOutline(0, js)
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		td := val.NewTupleDescriptor(val.Type{Enc: val.JsonAdaptiveEnc})
+		value, err := tree.GetField(ctx, td, 0, tuple, ns)
+		require.NoError(t, err)
+		_, isJsonBytes := value.(gmstypes.JSONBytes)
+		require.True(t, isJsonBytes, "expected gmstypes.JSONBytes, got %T", value)
+
+		out, err := unwrapToBytes(ctx, value, gmstypes.LongBlob, ns)
+		require.NoError(t, err)
+		require.Equal(t, jsonBytes, out)
+	})
+}
+
+// TestJsonSerializer_AdaptiveEncoding_SizeSweep checks that the JSON serializer produces
+// the correct binlog wire bytes across a range of document sizes that exercise both the
+// inline/out-of-band boundary in adaptive storage (~2 KiB) and the small-format/large-format
+// boundary in MySQL's JSON wire encoding (~64 KiB), in addition to small documents and
+// documents that comfortably exceed both thresholds.
+func TestJsonSerializer_AdaptiveEncoding_SizeSweep(t *testing.T) {
+	s := jsonSerializer{}
+	typ := gmstypes.JSON
+	ctx := context.Background()
+
+	// MySQL's JSON encoding switches from 16-bit to 32-bit offsets at 64 KiB. The single-key
+	// object {"k":"<filler>"} carries roughly 17 bytes of overhead (key entry + value entry +
+	// type id + count/size fields), so this filler-length range straddles that boundary along
+	// with the adaptive inline/out-of-band boundary at 2 KiB.
+	cases := []struct {
+		name        string
+		fillerBytes int
+	}{
+		{"small_inline", 8},                  // tiny — comfortably inline
+		{"medium_inline", 1024},              // close to inline threshold but under
+		{"just_over_inline", 4096},           // out-of-band, single chunk
+		{"medium_out_of_band", 16 * 1024},    // out-of-band, single chunk
+		{"under_64k_boundary", 60 * 1024},    // out-of-band, still small JSON encoding
+		{"over_64k_boundary", 70 * 1024},     // out-of-band, large JSON encoding
+		{"well_over_64k", 256 * 1024},        // out-of-band, multi-chunk blob
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			filler := strings.Repeat("a", tc.fillerBytes)
+			jsonBytes := []byte(`{"k":"` + filler + `"}`)
+
+			// Reference encoding: feed the JSON straight through encodeJsonDoc on a plain
+			// JSONDocument value. This is what the serializer should produce regardless of
+			// how the value is laid out in storage.
+			var refDoc interface{}
+			require.NoError(t, json.Unmarshal(jsonBytes, &refDoc))
+			refJsonBuf, err := encodeJsonDoc(ctx, gmstypes.JSONDocument{Val: refDoc})
+			require.NoError(t, err)
+			refLength := make([]byte, 4)
+			binary.LittleEndian.PutUint32(refLength, uint32(len(refJsonBuf)))
+			expectedWire := append(append([]byte{}, refLength...), refJsonBuf...)
+
+			tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.JsonAdaptiveEnc)
+			// PutAdaptiveJsonFromInline routes large values out-of-band automatically, so
+			// this single entry point exercises both inline and out-of-band storage.
+			require.NoError(t, tupleBuilder.PutAdaptiveJsonFromInline(ctx, 0, jsonBytes))
+			tuple, err := tupleBuilder.Build(ctx, buffPool)
+			require.NoError(t, err)
+
+			value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+			require.NoError(t, err)
+			require.NotNil(t, value)
+
+			gotWire, err := s.serialize(ctx, typ, value, ns)
+			require.NoError(t, err)
+			require.Equal(t, expectedWire, gotWire,
+				"wire format mismatch for fillerBytes=%d (total json bytes=%d)",
+				tc.fillerBytes, len(jsonBytes))
+		})
+	}
 }
 
 func TestGeometrySerializer_AdaptiveEncoding(t *testing.T) {

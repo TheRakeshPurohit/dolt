@@ -34,11 +34,11 @@ import (
 	"github.com/dolthub/dolt/go/store/val"
 )
 
-// unwrapToBytes converts a value loaded from a TEXT or BLOB tuple field (via tree.GetField)
-// into a flat byte slice. The value may be any of: a raw []byte, a string, a hash address
-// (legacy), an out-of-band wrapper (*val.TextStorage, *val.ByteArray), or a generic
-// sql.StringWrapper/sql.BytesWrapper. For any other type, it falls back to the SQL type's
-// Convert function.
+// unwrapToBytes converts a value loaded from a tuple field (via tree.GetField) into a flat
+// byte slice. It is intended for callers that produce a length-prefixed byte payload (TEXT
+// and BLOB serializers); it accepts every value shape that prolly_fields.go can return,
+// including the JSON wrappers that surface when a JSON-typed column is read. For any other
+// type it falls back to the SQL type's Convert function.
 func unwrapToBytes(ctx context.Context, value interface{}, typ sql.Type, ns tree.NodeStore) ([]byte, error) {
 	switch v := value.(type) {
 	case nil:
@@ -59,6 +59,13 @@ func unwrapToBytes(ctx context.Context, value interface{}, typ sql.Type, ns tree
 		return v.GetBytes(ctx)
 	case *val.ByteArray:
 		return v.ToBytes(ctx)
+	case gmstypes.JSONBytes:
+		// JSONBytes is implemented by IndexedJsonDocument and *val.JsonAdaptiveStorage;
+		// returning the raw JSON bytes avoids a deserialize/reserialize round trip.
+		return v.GetBytes(ctx)
+	case sql.JSONWrapper:
+		// Catches LazyJSONDocument and any other JSONWrapper that doesn't expose raw bytes.
+		return gmstypes.MarshallJson(ctx, v)
 	case sql.StringWrapper:
 		s, err := v.Unwrap(ctx)
 		if err != nil {
