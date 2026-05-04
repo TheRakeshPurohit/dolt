@@ -1155,11 +1155,11 @@ func TestBlobSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x03, 'a', 'b', 'c'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1174,11 +1174,11 @@ func TestBlobSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x03, 0x00, 'a', 'b', 'c'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1193,11 +1193,11 @@ func TestBlobSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x03, 0x00, 0x00, 'a', 'b', 'c'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1212,11 +1212,11 @@ func TestBlobSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x03, 0x00, 0x00, 0x00, 'a', 'b', 'c'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1259,11 +1259,11 @@ func TestTextSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x05, 'a', 'b', 'c', 'd', 'e'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1278,11 +1278,11 @@ func TestTextSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x05, 0x00, 'a', 'b', 'c', 'd', 'e'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1297,11 +1297,11 @@ func TestTextSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x05, 0x00, 0x00, 'a', 'b', 'c', 'd', 'e'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1316,11 +1316,11 @@ func TestTextSerializer(t *testing.T) {
 		tuple, err := tupleBuilder.Build(context.Background(), buffPool)
 		require.NoError(t, err)
 
-		value, err := s.deserialize(nil, typ, tupleDesc, tuple, 0, nil)
+		value, err := s.deserialize(context.Background(), typ, tupleDesc, tuple, 0, ns)
 		require.NoError(t, err)
 		require.NotNil(t, value)
 
-		bytes, err := s.serialize(nil, typ, value, ns)
+		bytes, err := s.serialize(context.Background(), typ, value, ns)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0x05, 0x00, 0x00, 0x00, 'a', 'b', 'c', 'd', 'e'}, bytes)
 		typeId, metadata := s.metadata(nil, typ)
@@ -1363,6 +1363,186 @@ func newTupleBuilderForEncoding(encoding val.Encoding) (*val.TupleDesc, *val.Tup
 	tupleDesc := val.NewTupleDescriptor(val.Type{Enc: encoding})
 	tupleBuilder := val.NewTupleBuilder(tupleDesc, ns)
 	return tupleDesc, tupleBuilder
+}
+
+// newAdaptiveBuilder returns a TupleDesc, TupleBuilder, and the NodeStore they share, so
+// callers can reuse the same NodeStore when later deserializing the tuple via tree.GetField.
+func newAdaptiveBuilder(encoding val.Encoding) (*val.TupleDesc, *val.TupleBuilder, tree.NodeStore) {
+	storage := &chunks.MemoryStorage{}
+	cs := storage.NewViewWithFormat("__DOLT__")
+	ns := tree.NewNodeStore(cs)
+	tupleDesc := val.NewTupleDescriptor(val.Type{Enc: encoding})
+	tupleBuilder := val.NewTupleBuilder(tupleDesc, ns)
+	return tupleDesc, tupleBuilder, ns
+}
+
+func TestTextSerializer_AdaptiveEncoding(t *testing.T) {
+	s := textSerializer{}
+	typ := gmstypes.Text
+	ctx := context.Background()
+
+	t.Run("inline", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.StringAdaptiveEnc)
+		require.NoError(t, tupleBuilder.PutAdaptiveStringFromInline(ctx, 0, "abcde"))
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x05, 0x00, 'a', 'b', 'c', 'd', 'e'}, bytes)
+	})
+
+	t.Run("out-of-band", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.StringAdaptiveEnc)
+		payload := []byte("abcde")
+		addr, err := ns.WriteBytes(ctx, payload)
+		require.NoError(t, err)
+		ts := val.NewTextStorage(ctx, addr, ns).WithMaxByteLength(int64(len(payload)))
+		tupleBuilder.PutAdaptiveStringFromOutline(0, ts)
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x05, 0x00, 'a', 'b', 'c', 'd', 'e'}, bytes)
+	})
+}
+
+func TestBlobSerializer_AdaptiveEncoding(t *testing.T) {
+	s := blobSerializer{}
+	typ := gmstypes.Blob
+	ctx := context.Background()
+
+	t.Run("inline", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.BytesAdaptiveEnc)
+		require.NoError(t, tupleBuilder.PutAdaptiveBytesFromInline(ctx, 0, []byte("abc")))
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x03, 0x00, 'a', 'b', 'c'}, bytes)
+	})
+
+	t.Run("out-of-band", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.BytesAdaptiveEnc)
+		payload := []byte("abc")
+		addr, err := ns.WriteBytes(ctx, payload)
+		require.NoError(t, err)
+		ba := val.NewByteArray(ctx, addr, ns).WithMaxByteLength(int64(len(payload)))
+		tupleBuilder.PutAdaptiveBytesFromOutline(0, ba)
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x03, 0x00, 'a', 'b', 'c'}, bytes)
+	})
+}
+
+func TestJsonSerializer_AdaptiveEncoding(t *testing.T) {
+	s := jsonSerializer{}
+	typ := gmstypes.JSON
+	ctx := context.Background()
+	jsonBytes := []byte(`{"a":"b"}`)
+	expectedWire := []byte{0x0f, 0x00, 0x00, 0x00,
+		0, 1, 0, 14, 0, 11, 0, 1, 0, 12, 12, 0, 97, 1, 98}
+
+	t.Run("inline", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.JsonAdaptiveEnc)
+		require.NoError(t, tupleBuilder.PutAdaptiveJsonFromInline(ctx, 0, jsonBytes))
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, expectedWire, bytes)
+	})
+
+	t.Run("out-of-band", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.JsonAdaptiveEnc)
+		addr, err := ns.WriteBytes(ctx, jsonBytes)
+		require.NoError(t, err)
+		js := val.NewJsonStorageOutOfBand(addr, ns, int64(len(jsonBytes)))
+		tupleBuilder.PutAdaptiveJsonFromOutline(0, js)
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, expectedWire, bytes)
+	})
+}
+
+func TestGeometrySerializer_AdaptiveEncoding(t *testing.T) {
+	s := geometrySerializer{}
+	typ := typeinfo.GeometryType.ToSqlType()
+	ctx := context.Background()
+	geoBytes := []byte{
+		0x00, 0x00, 0x00, 0x00, // SRID
+		0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xF0, 0x3F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0xBF}
+	expectedWire := []byte{
+		0x19, 0x0, 0x0, 0x0, // Length
+		0x0, 0x0, 0x0, 0x0, // SRID
+		0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xf0, 0x3f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0xbf}
+
+	t.Run("inline", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.GeomAdaptiveEnc)
+		require.NoError(t, tupleBuilder.PutAdaptiveGeomFromInline(ctx, 0, geoBytes))
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, expectedWire, bytes)
+	})
+
+	t.Run("out-of-band", func(t *testing.T) {
+		tupleDesc, tupleBuilder, ns := newAdaptiveBuilder(val.GeomAdaptiveEnc)
+		addr, err := ns.WriteBytes(ctx, geoBytes)
+		require.NoError(t, err)
+		tupleBuilder.PutAdaptiveGeomFromOutOfBand(0, int64(len(geoBytes)), addr)
+		tuple, err := tupleBuilder.Build(ctx, buffPool)
+		require.NoError(t, err)
+
+		value, err := s.deserialize(ctx, typ, tupleDesc, tuple, 0, ns)
+		require.NoError(t, err)
+		require.NotNil(t, value)
+
+		bytes, err := s.serialize(ctx, typ, value, ns)
+		require.NoError(t, err)
+		require.Equal(t, expectedWire, bytes)
+	})
 }
 
 func createTestStringSlice(length int) []string {

@@ -34,6 +34,57 @@ import (
 	"github.com/dolthub/dolt/go/store/val"
 )
 
+// unwrapToBytes converts a value loaded from a TEXT or BLOB tuple field (via tree.GetField)
+// into a flat byte slice. The value may be any of: a raw []byte, a string, a hash address
+// (legacy), an out-of-band wrapper (*val.TextStorage, *val.ByteArray), or a generic
+// sql.StringWrapper/sql.BytesWrapper. For any other type, it falls back to the SQL type's
+// Convert function.
+func unwrapToBytes(ctx context.Context, value interface{}, typ sql.Type, ns tree.NodeStore) ([]byte, error) {
+	switch v := value.(type) {
+	case nil:
+		return nil, nil
+	case []byte:
+		return v, nil
+	case string:
+		return []byte(v), nil
+	case hash.Hash:
+		if ns == nil {
+			return nil, fmt.Errorf("nil NodeStore used to load bytes from address")
+		}
+		if v.IsEmpty() {
+			return []byte{}, nil
+		}
+		return ns.ReadBytes(ctx, v)
+	case *val.TextStorage:
+		return v.GetBytes(ctx)
+	case *val.ByteArray:
+		return v.ToBytes(ctx)
+	case sql.StringWrapper:
+		s, err := v.Unwrap(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return []byte(s), nil
+	case sql.BytesWrapper:
+		return v.Unwrap(ctx)
+	default:
+		converted, _, err := typ.Convert(ctx, value)
+		if err != nil {
+			return nil, err
+		}
+		switch cv := converted.(type) {
+		case nil:
+			return nil, nil
+		case []byte:
+			return cv, nil
+		case string:
+			return []byte(cv), nil
+		default:
+			return nil, fmt.Errorf("expected []byte or string, got %T", converted)
+		}
+	}
+}
+
 // typeSerializer defines the serialization interface for deserializing a value in Dolt's
 // storage system and serializing it to the binary encoded used in MySQL's binlog.
 type typeSerializer interface {
@@ -941,27 +992,19 @@ type blobSerializer struct{}
 var _ typeSerializer = (*blobSerializer)(nil)
 
 func (b blobSerializer) deserialize(ctx context.Context, typ sql.Type, descriptor *val.TupleDesc, tuple val.Tuple, tupleIdx int, ns tree.NodeStore) (interface{}, error) {
-	addr, notNull := descriptor.GetBytesAddr(tupleIdx, tuple)
-	if !notNull {
-		return nil, nil
-	}
-	return addr, nil
+	// Use tree.GetField as the authoritative way to read the value from the tuple. It handles
+	// all storage encodings for BLOB types (BytesAddrEnc for legacy out-of-band columns and
+	// BytesAdaptiveEnc for adaptively encoded columns), returning either a raw []byte for
+	// inline-stored values or a *val.ByteArray wrapper for out-of-band values.
+	return tree.GetField(ctx, descriptor, tupleIdx, tuple, ns)
 }
 
 func (b blobSerializer) serialize(ctx context.Context, typ sql.Type, value interface{}, ns tree.NodeStore) (data []byte, err error) {
-	switch value.(type) {
-	case hash.Hash:
-		return encodeBytesFromAddress(ctx, value.(hash.Hash), ns, typ)
-
-	case string:
-		return encodeBlobBytes(typ, []byte(value.(string)))
-
-	case []byte:
-		return encodeBlobBytes(typ, value.([]byte))
-
-	default:
-		return nil, fmt.Errorf("expected hash.Hash or []byte, but got %T", value)
+	bytes, err := unwrapToBytes(ctx, value, typ, ns)
+	if err != nil {
+		return nil, err
 	}
+	return encodeBlobBytes(typ, bytes)
 }
 
 func (b blobSerializer) metadata(_ *sql.Context, typ sql.Type) (byte, uint16) {
@@ -984,36 +1027,18 @@ type textSerializer struct{}
 var _ typeSerializer = (*textSerializer)(nil)
 
 func (t textSerializer) deserialize(ctx context.Context, typ sql.Type, descriptor *val.TupleDesc, tuple val.Tuple, tupleIdx int, ns tree.NodeStore) (interface{}, error) {
-	addr, notNull := descriptor.GetStringAddr(tupleIdx, tuple)
-	if !notNull {
-		return nil, nil
-	}
-	return addr, nil
+	// Use tree.GetField as the authoritative way to read the value from the tuple. It handles
+	// all storage encodings for TEXT types (StringAddrEnc for legacy out-of-band columns and
+	// StringAdaptiveEnc for adaptively encoded columns), returning either a raw string for
+	// inline-stored values or a *val.TextStorage wrapper for out-of-band values.
+	return tree.GetField(ctx, descriptor, tupleIdx, tuple, ns)
 }
 
 func (t textSerializer) serialize(ctx context.Context, typ sql.Type, value interface{}, ns tree.NodeStore) (data []byte, err error) {
-	// If we get an address, go ahead and use it directly
-	if addr, ok := value.(hash.Hash); ok {
-		return encodeBytesFromAddress(ctx, addr, ns, typ)
-	}
-
-	convertedValue, _, err := typ.Convert(ctx, value)
+	bytes, err := unwrapToBytes(ctx, value, typ, ns)
 	if err != nil {
 		return nil, err
 	}
-
-	var bytes []byte
-	switch convertedValue.(type) {
-	case []byte:
-		bytes = convertedValue.([]byte)
-	case string:
-		bytes = []byte(convertedValue.(string))
-	case hash.Hash:
-		return encodeBytesFromAddress(ctx, convertedValue.(hash.Hash), ns, typ)
-	default:
-		return nil, fmt.Errorf("expected []byte or string, got %T", convertedValue)
-	}
-
 	return encodeBlobBytes(typ, bytes)
 }
 
@@ -1095,20 +1120,42 @@ func (g geometrySerializer) deserialize(ctx context.Context, typ sql.Type, descr
 }
 
 func (g geometrySerializer) serialize(ctx context.Context, typ sql.Type, value interface{}, ns tree.NodeStore) (data []byte, err error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	// For adaptively-encoded geometry columns stored out of band, tree.GetField returns
+	// a *val.GeometryStorage wrapper. Unwrap it into the raw WKB bytes here, since
+	// types.Geometry.Convert does not know how to handle the wrapper.
+	if storage, ok := value.(*val.GeometryStorage); ok {
+		bytes, err := storage.GetSerializedBytes(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return appendGeometryWithLengthPrefix(bytes), nil
+	}
+
 	geometry, _, err := typ.Convert(ctx, value)
 	if err != nil {
 		return nil, err
 	}
 
-	if geometry != nil {
-		geoType := geometry.(gmstypes.GeometryValue)
-		bytes := geoType.Serialize()
-		bytesLengthBuffer := make([]byte, 4)
-		binary.LittleEndian.PutUint32(bytesLengthBuffer, uint32(len(bytes)))
-		data = append(data, bytesLengthBuffer...)
-		data = append(data, bytes...)
+	if geometry == nil {
+		return nil, nil
 	}
-	return data, nil
+	geoType, ok := geometry.(gmstypes.GeometryValue)
+	if !ok {
+		return nil, fmt.Errorf("expected GeometryValue, got %T", geometry)
+	}
+	return appendGeometryWithLengthPrefix(geoType.Serialize()), nil
+}
+
+// appendGeometryWithLengthPrefix prefixes the given geometry bytes with their 4-byte
+// little-endian length, as required by MySQL's binlog wire format for GEOMETRY values.
+func appendGeometryWithLengthPrefix(bytes []byte) []byte {
+	data := make([]byte, 4, 4+len(bytes))
+	binary.LittleEndian.PutUint32(data, uint32(len(bytes)))
+	return append(data, bytes...)
 }
 
 func (g geometrySerializer) metadata(_ *sql.Context, typ sql.Type) (byte, uint16) {
