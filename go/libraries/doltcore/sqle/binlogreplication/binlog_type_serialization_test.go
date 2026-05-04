@@ -1570,13 +1570,13 @@ func TestJsonSerializer_AdaptiveEncoding_SizeSweep(t *testing.T) {
 		name        string
 		fillerBytes int
 	}{
-		{"small_inline", 8},                  // tiny — comfortably inline
-		{"medium_inline", 1024},              // close to inline threshold but under
-		{"just_over_inline", 4096},           // out-of-band, single chunk
-		{"medium_out_of_band", 16 * 1024},    // out-of-band, single chunk
-		{"under_64k_boundary", 60 * 1024},    // out-of-band, still small JSON encoding
-		{"over_64k_boundary", 70 * 1024},     // out-of-band, large JSON encoding
-		{"well_over_64k", 256 * 1024},        // out-of-band, multi-chunk blob
+		{"small_inline", 8},               // tiny — comfortably inline
+		{"medium_inline", 1024},           // close to inline threshold but under
+		{"just_over_inline", 4096},        // out-of-band, single chunk
+		{"medium_out_of_band", 16 * 1024}, // out-of-band, single chunk
+		{"under_64k_boundary", 60 * 1024}, // out-of-band, still small JSON encoding
+		{"over_64k_boundary", 70 * 1024},  // out-of-band, large JSON encoding
+		{"well_over_64k", 256 * 1024},     // out-of-band, multi-chunk blob
 	}
 
 	for _, tc := range cases {
