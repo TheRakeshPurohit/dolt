@@ -696,7 +696,7 @@ func (di *doltIndex) prollyRanges(ctx *sql.Context, ns tree.NodeStore, ranges ..
 	// really not rely on the integrator to maintain this tenuous relationship.
 	var err error
 	if !di.spatial {
-		ranges, err = pruneEmptyRanges(ranges)
+		ranges, err = pruneEmptyRanges(ctx, ranges)
 		if err != nil {
 			return nil, err
 		}
@@ -947,12 +947,12 @@ func keyBuilderForIndex(idx durable.Index) *val.TupleBuilder {
 	return val.NewTupleBuilder(kd, m.NodeStore())
 }
 
-func pruneEmptyRanges(sqlRanges []sql.MySQLRange) (pruned []sql.MySQLRange, err error) {
+func pruneEmptyRanges(ctx context.Context, sqlRanges []sql.MySQLRange) (pruned []sql.MySQLRange, err error) {
 	pruned = make([]sql.MySQLRange, 0, len(sqlRanges))
 	for _, sr := range sqlRanges {
 		empty := false
 		for _, colExpr := range sr {
-			empty, err = colExpr.IsEmpty()
+			empty, err = colExpr.IsEmpty(ctx)
 			if err != nil {
 				return nil, err
 			} else if empty {
@@ -1058,7 +1058,7 @@ func (di *doltIndex) prollySpatialRanges(ranges []sql.MySQLRange) ([]prolly.Rang
 func (di *doltIndex) prollyRangesFromSqlRanges(ctx context.Context, ns tree.NodeStore, ranges []sql.MySQLRange, tb *val.TupleBuilder) ([]prolly.Range, error) {
 	var err error
 	if !di.spatial {
-		ranges, err = pruneEmptyRanges(ranges)
+		ranges, err = pruneEmptyRanges(ctx, ranges)
 		if err != nil {
 			return nil, err
 		}
@@ -1099,7 +1099,7 @@ func (di *doltIndex) prollyRangesFromSqlRanges(ctx context.Context, ns tree.Node
 			}
 		}
 		// BuildPermissive() allows nulls in non-null fields
-		tup, err := tb.BuildPermissive(sharePool)
+		tup, err := tb.BuildPermissive(ctx, sharePool)
 		if err != nil {
 			return nil, err
 		}
@@ -1135,7 +1135,7 @@ func (di *doltIndex) prollyRangesFromSqlRanges(ctx context.Context, ns tree.Node
 			}
 		}
 
-		tup, err = tb.BuildPermissive(sharePool)
+		tup, err = tb.BuildPermissive(ctx, sharePool)
 		if err != nil {
 			return nil, err
 		}
@@ -1209,18 +1209,18 @@ func getRangeCutValue(ctx context.Context, cut sql.MySQLRangeCut, typ sql.Type) 
 //
 // This is for building physical scans against storage which does not store
 // NULL contiguous and ordered < non-NULL values.
-func SplitNullsFromRange(r sql.MySQLRange) ([]sql.MySQLRange, error) {
+func SplitNullsFromRange(ctx context.Context, r sql.MySQLRange) ([]sql.MySQLRange, error) {
 	res := []sql.MySQLRange{{}}
 
 	for _, rce := range r {
 		if _, ok := rce.LowerBound.(sql.BelowNull); ok {
 			// May include NULL. Split it and add each non-empty range.
-			withnull, nullok, err := rce.TryIntersect(sql.NullRangeColumnExpr(rce.Typ))
+			withnull, nullok, err := rce.TryIntersect(ctx, sql.NullRangeColumnExpr(rce.Typ))
 			if err != nil {
 				return nil, err
 			}
 			fornull := res[:]
-			withoutnull, withoutnullok, err := rce.TryIntersect(sql.NotNullRangeColumnExpr(rce.Typ))
+			withoutnull, withoutnullok, err := rce.TryIntersect(ctx, sql.NotNullRangeColumnExpr(rce.Typ))
 			if err != nil {
 				return nil, err
 			}

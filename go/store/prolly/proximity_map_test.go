@@ -70,7 +70,7 @@ func buildTuple(t *testing.T, ctx context.Context, ns tree.NodeStore, pool pool.
 		err := tree.PutField(ctx, ns, builder, i, column)
 		require.NoError(t, err)
 	}
-	tup, err := builder.Build(pool)
+	tup, err := builder.Build(context.Background(), pool)
 	require.NoError(t, err)
 	return tup
 }
@@ -632,11 +632,11 @@ func testIncrementalUpdates(t *testing.T, keyDesc *val.TupleDesc) {
 		// update leaf node
 		{
 			putVector(t, keyBuilder, encodeVector(t, keyDesc, 0.0, 1.0))
-			nextKey, err := keyBuilder.Build(bp)
+			nextKey, err := keyBuilder.Build(context.Background(), bp)
 			require.NoError(t, err)
 
 			valueBuilder.PutInt64(0, 5)
-			nextValue, err := valueBuilder.Build(bp)
+			nextValue, err := valueBuilder.Build(context.Background(), bp)
 			require.NoError(t, err)
 
 			err = mutableMap.Put(ctx, nextKey, nextValue)
@@ -668,11 +668,11 @@ func testIncrementalUpdates(t *testing.T, keyDesc *val.TupleDesc) {
 		// update root node
 		{
 			putVector(t, keyBuilder, encodeVector(t, keyDesc, 5.0, 6.0))
-			nextKey, err := keyBuilder.Build(bp)
+			nextKey, err := keyBuilder.Build(context.Background(), bp)
 			require.NoError(t, err)
 
 			valueBuilder.PutInt64(0, 6)
-			nextValue, err := valueBuilder.Build(bp)
+			nextValue, err := valueBuilder.Build(context.Background(), bp)
 			require.NoError(t, err)
 
 			err = mutableMap.Put(ctx, nextKey, nextValue)
@@ -727,7 +727,7 @@ func testIncrementalDeletes(t *testing.T, keyDesc *val.TupleDesc) {
 		// delete leaf node
 		{
 			putVector(t, keyBuilder, encodeVector(t, keyDesc, 0.0, 1.0))
-			nextKey, err := keyBuilder.Build(bp)
+			nextKey, err := keyBuilder.Build(context.Background(), bp)
 			require.NoError(t, err)
 
 			err = mutableMap.Put(ctx, nextKey, nil)
@@ -752,7 +752,7 @@ func testIncrementalDeletes(t *testing.T, keyDesc *val.TupleDesc) {
 		// delete root node
 		{
 			putVector(t, keyBuilder, encodeVector(t, keyDesc, 5.0, 6.0))
-			nextKey, err := keyBuilder.Build(bp)
+			nextKey, err := keyBuilder.Build(context.Background(), bp)
 			require.NoError(t, err)
 
 			err = mutableMap.Put(ctx, nextKey, nil)

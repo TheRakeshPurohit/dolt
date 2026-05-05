@@ -83,7 +83,7 @@ func prollyParentSecDiffFkConstraintViolations(
 	err = prolly.DiffMaps(ctx, preParentSecIdx, postParentSecIdx, considerAllRowsModified, func(ctx context.Context, diff tree.Diff) error {
 		switch diff.Type {
 		case tree.RemovedDiff, tree.ModifiedDiff:
-			k, hadNulls, err := makePartialKey(parentIdxKb, foreignKey.ReferencedTableColumns, postParent.Index, postParent.IndexSchema, val.Tuple(diff.Key), val.Tuple(diff.From), preParentSecIdx.Pool())
+			k, hadNulls, err := makePartialKey(ctx, parentIdxKb, foreignKey.ReferencedTableColumns, postParent.Index, postParent.IndexSchema, val.Tuple(diff.Key), val.Tuple(diff.From), preParentSecIdx.Pool())
 			if err != nil {
 				return err
 			}
@@ -178,7 +178,7 @@ func prollyParentPriDiffFkConstraintViolations(
 	err = prolly.DiffMaps(ctx, preParentRowData, postParentRowData, considerAllRowsModified, func(ctx context.Context, diff tree.Diff) error {
 		switch diff.Type {
 		case tree.RemovedDiff, tree.ModifiedDiff:
-			partialKey, hadNulls, err := makePartialKey(partialKB, foreignKey.ReferencedTableColumns, postParent.Index, postParent.Schema, val.Tuple(diff.Key), val.Tuple(diff.From), preParentRowData.Pool())
+			partialKey, hadNulls, err := makePartialKey(ctx, partialKB, foreignKey.ReferencedTableColumns, postParent.Index, postParent.Schema, val.Tuple(diff.Key), val.Tuple(diff.From), preParentRowData.Pool())
 			if err != nil {
 				return err
 			}
@@ -268,6 +268,7 @@ func prollyChildPriDiffFkConstraintViolations(
 		case tree.AddedDiff, tree.ModifiedDiff:
 			k, v := val.Tuple(diff.Key), val.Tuple(diff.To)
 			parentLookupKey, hasNulls, err := makePartialKey(
+				ctx,
 				partialKB,
 				foreignKey.TableColumns,
 				postChild.Index,
@@ -512,7 +513,7 @@ func createCVForSecIdx(
 ) error {
 
 	// convert secondary idx entry to primary row key
-	primaryKey, err := primaryKeyFromSecondaryIndexRow(k, primaryKD, pri, tableSchema, indexSchema)
+	primaryKey, err := primaryKeyFromSecondaryIndexRow(ctx, k, primaryKD, pri, tableSchema, indexSchema)
 	if err != nil {
 		return err
 	}
@@ -532,7 +533,7 @@ func createCVForSecIdx(
 	return receiver.ProllyFKViolationFound(ctx, primaryKey, value)
 }
 
-func primaryKeyFromSecondaryIndexRow(secIndexRow val.Tuple, primaryKD *val.TupleDesc, pri prolly.Map, tableSchema schema.Schema, indexSchema schema.Schema) (val.Tuple, error) {
+func primaryKeyFromSecondaryIndexRow(ctx context.Context, secIndexRow val.Tuple, primaryKD *val.TupleDesc, pri prolly.Map, tableSchema schema.Schema, indexSchema schema.Schema) (val.Tuple, error) {
 	keyMap := makeOrdinalMappingForSchemas(indexSchema, tableSchema)
 
 	kb := val.NewTupleBuilder(primaryKD, pri.NodeStore())
@@ -541,7 +542,7 @@ func primaryKeyFromSecondaryIndexRow(secIndexRow val.Tuple, primaryKD *val.Tuple
 		kb.PutRaw(to, secIndexRow.GetField(from))
 	}
 
-	return kb.Build(pri.Pool())
+	return kb.Build(ctx, pri.Pool())
 }
 
 // makeOrdinalMappingForSchemas creates an ordinal mapping from one schema to another based on column names.
@@ -609,7 +610,7 @@ func createCVsForDanglingChildRows(
 		}
 
 		// convert secondary idx entry to primary row key
-		primaryIdxKey, err := primaryKeyFromSecondaryIndexRow(k, childPrimaryIdx.keyDesc, childPrimaryIdx.index, childPrimaryIdx.schema, childSecIdx.schema)
+		primaryIdxKey, err := primaryKeyFromSecondaryIndexRow(ctx, k, childPrimaryIdx.keyDesc, childPrimaryIdx.index, childPrimaryIdx.schema, childSecIdx.schema)
 		if err != nil {
 			return err
 		}
@@ -703,7 +704,7 @@ func convertKeyBetweenTypes(
 	}
 
 	var err error
-	key, err = tb.Build(pool)
+	key, err = tb.Build(ctx, pool)
 	if err != nil {
 		return nil, err
 	}
@@ -778,7 +779,7 @@ func convertNativeEncodedFkField(
 	}
 }
 
-func makePartialKey(kb *val.TupleBuilder, tags []uint64, idxSch schema.Index, tblSch schema.Schema, k, v val.Tuple, pool pool.BuffPool) (val.Tuple, bool, error) {
+func makePartialKey(ctx context.Context, kb *val.TupleBuilder, tags []uint64, idxSch schema.Index, tblSch schema.Schema, k, v val.Tuple, pool pool.BuffPool) (val.Tuple, bool, error) {
 	// Possible that the parent index (idxSch) is longer than the partial key (tags).
 	if idxSch.Name() != "" && len(idxSch.IndexedColumnTags()) <= len(tags) {
 		tags = idxSch.IndexedColumnTags()
@@ -803,7 +804,7 @@ func makePartialKey(kb *val.TupleBuilder, tags []uint64, idxSch schema.Index, tb
 		}
 	}
 
-	tup, err := kb.Build(pool)
+	tup, err := kb.Build(ctx, pool)
 	return tup, false, err
 }
 

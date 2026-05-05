@@ -350,7 +350,7 @@ func (d *prollyCVDeleter) Delete(ctx *sql.Context, r sql.Row) error {
 	}
 	d.kb.PutByteString(numPks+2, prolly.ConstraintViolationInfoHash(violationInfoBytes))
 
-	newKey, err := d.kb.Build(d.pool)
+	newKey, err := d.kb.Build(ctx, d.pool)
 	if err != nil {
 		return err
 	}
@@ -364,7 +364,7 @@ func (d *prollyCVDeleter) Delete(ctx *sql.Context, r sql.Row) error {
 	if err := fillArtifactKeyPrefix(ctx, nodeStore, legacyKeyBuilder, r, numPks, rootHash, artifactType); err != nil {
 		return err
 	}
-	legacyKey, err := legacyKeyBuilder.Build(d.pool)
+	legacyKey, err := legacyKeyBuilder.Build(ctx, d.pool)
 	if err != nil {
 		return err
 	}

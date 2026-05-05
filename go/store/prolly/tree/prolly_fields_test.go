@@ -213,7 +213,7 @@ func testRoundTripProllyFields(t *testing.T, test prollyFieldTest) {
 	err := PutField(ctx, ns, builder, 0, test.value)
 	require.NoError(t, err)
 
-	tup, err := builder.Build(testPool)
+	tup, err := builder.Build(context.Background(), testPool)
 	require.NoError(t, err)
 
 	v, err := GetField(ctx, desc, 0, tup, ns)
@@ -314,7 +314,7 @@ func TestGeometryEncoding(t *testing.T) {
 			builder := val.NewTupleBuilder(oldDesc, ns)
 			b := serializeGeometry(test.value)
 			builder.PutGeometry(0, b)
-			tup, err := builder.Build(testPool)
+			tup, err := builder.Build(context.Background(), testPool)
 			require.NoError(t, err)
 
 			var v interface{}

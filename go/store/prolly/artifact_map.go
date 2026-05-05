@@ -357,7 +357,7 @@ type ArtifactsEditor struct {
 // |violationInfoHash|. For foreign key, unique index, check constraint, and not null violations pass
 // [ConstraintViolationInfoHash] with |meta.VInfo| so multiple violations of the same type for the same row get distinct
 // keys. For conflicts pass nil (zeros). Old keys without the violation-info hash suffix are still valid.
-func (wr *ArtifactsEditor) BuildArtifactKey(_ context.Context, srcKey val.Tuple, srcRootish hash.Hash, artType ArtifactType, violationInfoHash []byte) (val.Tuple, error) {
+func (wr *ArtifactsEditor) BuildArtifactKey(ctx context.Context, srcKey val.Tuple, srcRootish hash.Hash, artType ArtifactType, violationInfoHash []byte) (val.Tuple, error) {
 	for i := 0; i < srcKey.Count(); i++ {
 		wr.artKB.PutRaw(i, srcKey.GetField(i))
 	}
@@ -368,7 +368,7 @@ func (wr *ArtifactsEditor) BuildArtifactKey(_ context.Context, srcKey val.Tuple,
 	} else {
 		wr.artKB.PutByteString(srcKey.Count()+2, make([]byte, violationInfoHashSize))
 	}
-	return wr.artKB.Build(wr.pool)
+	return wr.artKB.Build(ctx, wr.pool)
 }
 
 // Add adds an artifact entry. The key includes |srcKey|, |srcRootish|, |artType|, and |violationInfoHash|.
@@ -381,7 +381,7 @@ func (wr *ArtifactsEditor) Add(ctx context.Context, srcKey val.Tuple, srcRootish
 	}
 
 	wr.artVB.PutJSON(0, meta)
-	value, err := wr.artVB.Build(wr.pool)
+	value, err := wr.artVB.Build(ctx, wr.pool)
 	if err != nil {
 		return err
 	}
@@ -642,7 +642,7 @@ func (itr artifactIterImpl) Next(ctx context.Context) (Artifact, error) {
 		return Artifact{}, err
 	}
 
-	srcKey, err := itr.getSrcKeyFromArtKey(artKey)
+	srcKey, err := itr.getSrcKeyFromArtKey(ctx, artKey)
 	if err != nil {
 		return Artifact{}, err
 	}
@@ -659,11 +659,11 @@ func (itr artifactIterImpl) Next(ctx context.Context) (Artifact, error) {
 	}, nil
 }
 
-func (itr artifactIterImpl) getSrcKeyFromArtKey(k val.Tuple) (val.Tuple, error) {
+func (itr artifactIterImpl) getSrcKeyFromArtKey(ctx context.Context, k val.Tuple) (val.Tuple, error) {
 	for i := 0; i < itr.numPks; i++ {
 		itr.tb.PutRaw(i, k.GetField(i))
 	}
-	return itr.tb.Build(itr.pool)
+	return itr.tb.Build(ctx, itr.pool)
 }
 
 // Artifact is a struct representing an artifact in the artifacts table

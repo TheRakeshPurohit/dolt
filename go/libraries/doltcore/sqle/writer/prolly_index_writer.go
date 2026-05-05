@@ -130,7 +130,7 @@ func (m prollyIndexWriter) keyFromRow(ctx context.Context, sqlRow sql.Row) (val.
 			return nil, err
 		}
 	}
-	return m.keyBld.BuildPermissive(sharePool)
+	return m.keyBld.BuildPermissive(ctx, sharePool)
 }
 
 func (m prollyIndexWriter) ValidateKeyViolations(ctx context.Context, sqlRow sql.Row) error {
@@ -165,7 +165,7 @@ func (m prollyIndexWriter) Insert(ctx context.Context, sqlRow sql.Row) error {
 			return err
 		}
 	}
-	v, err := m.valBld.Build(sharePool)
+	v, err := m.valBld.Build(ctx, sharePool)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ func (m prollyIndexWriter) Update(ctx context.Context, oldRow sql.Row, newRow sq
 			return err
 		}
 	}
-	v, err := m.valBld.Build(sharePool)
+	v, err := m.valBld.Build(ctx, sharePool)
 	if err != nil {
 		return err
 	}
@@ -340,7 +340,7 @@ func (m prollySecondaryIndexWriter) keyFromRow(ctx context.Context, sqlRow sql.R
 			return nil, err
 		}
 	}
-	return m.keyBld.Build(sharePool)
+	return m.keyBld.Build(ctx, sharePool)
 }
 
 func (m prollySecondaryIndexWriter) VisitGCRoots(ctx context.Context, roots func(hash.Hash) bool) error {
@@ -393,7 +393,7 @@ func (m prollySecondaryIndexWriter) checkForUniqueKeyErr(ctx context.Context, sq
 		from := m.pkMap.MapOrdinal(to)
 		m.pkBld.PutRaw(to, idxDesc.GetField(from, idxKey))
 	}
-	existingPK, err := m.pkBld.Build(sharePool)
+	existingPK, err := m.pkBld.Build(ctx, sharePool)
 	if err != nil {
 		return err
 	}

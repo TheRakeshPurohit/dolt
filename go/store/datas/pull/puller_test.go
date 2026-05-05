@@ -125,7 +125,7 @@ type testTuple struct {
 func buildKeyTuple(ns tree.NodeStore, k int64) val.Tuple {
 	tb := val.NewTupleBuilder(testKeyDesc, ns)
 	tb.PutInt64(0, k)
-	tup, _ := tb.Build(ns.Pool())
+	tup, _ := tb.Build(context.Background(), ns.Pool())
 	return tup
 }
 
@@ -133,7 +133,7 @@ func buildValTuple(ns tree.NodeStore, v0, v1 string) val.Tuple {
 	tb := val.NewTupleBuilder(testValDesc, ns)
 	tb.PutString(0, v0)
 	tb.PutString(1, v1)
-	tup, _ := tb.Build(ns.Pool())
+	tup, _ := tb.Build(context.Background(), ns.Pool())
 	return tup
 }
 

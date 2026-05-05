@@ -292,7 +292,7 @@ func (b *ProximityMapBuilder) Insert(ctx context.Context, key, value []byte) err
 	levelMapKeyBuilder := val.NewTupleBuilder(proximitylevelMapKeyDesc, b.ns)
 	levelMapKeyBuilder.PutUint8(0, 255-keyLevel)
 	levelMapKeyBuilder.PutByteString(1, key)
-	tup, err := levelMapKeyBuilder.Build(b.ns.Pool())
+	tup, err := levelMapKeyBuilder.Build(ctx, b.ns.Pool())
 	if err != nil {
 		return err
 	}
@@ -318,7 +318,7 @@ func (b *ProximityMapBuilder) InsertAtLevel(ctx context.Context, key, value []by
 	levelMapKeyBuilder := val.NewTupleBuilder(proximitylevelMapKeyDesc, b.ns)
 	levelMapKeyBuilder.PutUint8(0, 255-keyLevel)
 	levelMapKeyBuilder.PutByteString(1, key)
-	tup, err := levelMapKeyBuilder.Build(b.ns.Pool())
+	tup, err := levelMapKeyBuilder.Build(ctx, b.ns.Pool())
 	if err != nil {
 		return err
 	}

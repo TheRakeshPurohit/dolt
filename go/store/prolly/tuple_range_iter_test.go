@@ -219,7 +219,7 @@ func getKeyPrefix(key val.Tuple, desc *val.TupleDesc) (partial val.Tuple, err er
 	for i := range desc.Types {
 		tb.PutRaw(i, key.GetField(i))
 	}
-	return tb.Build(sharedPool)
+	return tb.Build(context.Background(), sharedPool)
 }
 
 // computes expected range on full tuples set
@@ -431,7 +431,7 @@ func intTuple(ints ...int32) val.Tuple {
 	for i := range ints {
 		tb.PutInt32(i, ints[i])
 	}
-	tup, err := tb.Build(sharedPool)
+	tup, err := tb.Build(context.Background(), sharedPool)
 	if err != nil {
 		panic(err)
 	}

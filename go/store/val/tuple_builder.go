@@ -91,20 +91,18 @@ func (tb *TupleBuilder) WithMaxRowSize(target uint16) *TupleBuilder {
 }
 
 // Build materializes a Tuple from the fields written to the TupleBuilder.
-func (tb *TupleBuilder) Build(pool pool.BuffPool) (tup Tuple, err error) {
+func (tb *TupleBuilder) Build(ctx context.Context, pool pool.BuffPool) (tup Tuple, err error) {
 	for i, typ := range tb.Desc.Types {
 		if !typ.Nullable && tb.fields[i] == nil {
 			panic("cannot write NULL to non-NULL field: " + strconv.Itoa(i))
 		}
 	}
-	return tb.BuildPermissive(pool)
+	return tb.BuildPermissive(ctx, pool)
 }
 
 // BuildPermissive materializes a Tuple from the fields
 // written to the TupleBuilder without validating nullability.
-func (tb *TupleBuilder) BuildPermissive(pool pool.BuffPool) (tup Tuple, err error) {
-	// TODO: add context parameter
-	ctx := context.Background()
+func (tb *TupleBuilder) BuildPermissive(ctx context.Context, pool pool.BuffPool) (tup Tuple, err error) {
 	// Values may get passed into the tuple builder in either in-band or out-of-band form.
 	// In the best case, we don't need to convert any of them, so the TupleBuilder initially stores them in the form they're given.
 	// But we track the tuple size if they're all inlined vs the tuple size if they're all out-of-band,

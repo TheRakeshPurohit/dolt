@@ -135,11 +135,11 @@ func buildIndex(
 		pkMapping := ordinalMappingFromIndex(index)
 
 		mergedMap, err := creation.BuildUniqueProllyIndex(ctx, vrw, ns, postMergeSchema, tblName, index, m, func(ctx context.Context, existingKey, newKey val.Tuple) (err error) {
-			eK, err := getPKFromSecondaryKey(kb, p, pkMapping, existingKey)
+			eK, err := getPKFromSecondaryKey(ctx, kb, p, pkMapping, existingKey)
 			if err != nil {
 				return err
 			}
-			nK, err := getPKFromSecondaryKey(kb, p, pkMapping, newKey)
+			nK, err := getPKFromSecondaryKey(ctx, kb, p, pkMapping, newKey)
 			if err != nil {
 				return err
 			}

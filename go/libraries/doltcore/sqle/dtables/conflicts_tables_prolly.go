@@ -657,7 +657,7 @@ func (cd *prollyConflictDeleter) Delete(ctx *sql.Context, r sql.Row) (err error)
 	cd.kB.PutUint8(numSourceKeyFields+1, uint8(prolly.ArtifactTypeConflict))
 	cd.kB.PutByteString(numSourceKeyFields+2, make([]byte, hash.ByteLen))
 
-	key, err := cd.kB.Build(cd.pool)
+	key, err := cd.kB.Build(ctx, cd.pool)
 	if err != nil {
 		return err
 	}
@@ -712,7 +712,7 @@ func (cd *prollyConflictDeleter) putKeylessHash(ctx *sql.Context, r sql.Row) err
 		}
 	}
 
-	v, err := cd.vB.Build(cd.pool)
+	v, err := cd.vB.Build(ctx, cd.pool)
 	if err != nil {
 		return err
 	}

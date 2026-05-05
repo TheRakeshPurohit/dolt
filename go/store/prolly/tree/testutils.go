@@ -131,12 +131,12 @@ func AscendingUintTuples(count int) (tuples [][2]val.Tuple, desc *val.TupleDesc)
 	var err error
 	for i := range tuples {
 		bld.PutUint32(0, uint32(i))
-		tuples[i][0], err = bld.Build(sharedPool)
+		tuples[i][0], err = bld.Build(context.Background(), sharedPool)
 		if err != nil {
 			panic(err)
 		}
 		bld.PutUint32(0, uint32(i+count))
-		tuples[i][1], err = bld.Build(sharedPool)
+		tuples[i][1], err = bld.Build(context.Background(), sharedPool)
 		if err != nil {
 			panic(err)
 		}
@@ -153,12 +153,12 @@ func AscendingUintTuplesWithStep(count int, keyStart int, valStart int, step int
 	value := valStart
 	for i := range tuples {
 		bld.PutUint32(0, uint32(key))
-		tuples[i][0], err = bld.Build(sharedPool)
+		tuples[i][0], err = bld.Build(context.Background(), sharedPool)
 		if err != nil {
 			panic(err)
 		}
 		bld.PutUint32(0, uint32(value))
-		tuples[i][1], err = bld.Build(sharedPool)
+		tuples[i][1], err = bld.Build(context.Background(), sharedPool)
 		if err != nil {
 			panic(err)
 		}
@@ -172,7 +172,7 @@ func RandomTuple(tb *val.TupleBuilder, ns NodeStore) (tup val.Tuple, err error) 
 	for i, typ := range tb.Desc.Types {
 		randomField(tb, i, typ, ns)
 	}
-	return tb.Build(sharedPool)
+	return tb.Build(context.Background(), sharedPool)
 }
 
 func CloneRandomTuples(items [][2]val.Tuple) (clone [][2]val.Tuple) {

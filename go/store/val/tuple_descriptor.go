@@ -599,9 +599,7 @@ func GetBytesAdaptiveValue(ctx context.Context, vs ValueStore, val []byte) (inte
 }
 
 // GetStringAdaptiveValue returns either a string or a StringWrapper, but Go doesn't allow us to use a single type for that.
-func (td *TupleDesc) GetStringAdaptiveValue(i int, vs ValueStore, tup Tuple) (interface{}, bool, error) {
-	// TODO: Add context parameter
-	ctx := context.Background()
+func (td *TupleDesc) GetStringAdaptiveValue(ctx context.Context, i int, vs ValueStore, tup Tuple) (interface{}, bool, error) {
 	td.ExpectEncoding(i, StringAdaptiveEnc)
 	adaptiveValue := AdaptiveValue(td.GetField(i, tup))
 	if len(adaptiveValue) == 0 {
@@ -864,7 +862,7 @@ func (handler AddressTypeHandler) SerializeValue(ctx context.Context, val any) (
 	if len(b) == 0 {
 		return nil, nil
 	}
-	h, err := handler.vs.WriteBytes(context.Background(), b)
+	h, err := handler.vs.WriteBytes(ctx, b)
 	if err != nil {
 		return nil, err
 	}

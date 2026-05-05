@@ -54,7 +54,7 @@ func firstRowForIndex(ctx *sql.Context, idxLen int, prollyMap prolly.Map, keyBui
 		keyBuilder.PutRaw(i, keyBytes.GetField(i))
 	}
 
-	firstKey, err := keyBuilder.Build(buffPool)
+	firstKey, err := keyBuilder.Build(ctx, buffPool)
 	if err != nil {
 		return nil, err
 	}

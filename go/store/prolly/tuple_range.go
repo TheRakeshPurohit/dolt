@@ -339,7 +339,7 @@ func IncrementTuple(ctx context.Context, start val.Tuple, n int, desc *val.Tuple
 	default:
 		return nil, false, nil
 	}
-	stop, err := tb.Build(pool)
+	stop, err := tb.Build(ctx, pool)
 	if err != nil {
 		return nil, false, err
 	}

@@ -81,7 +81,7 @@ func smokeTestTupleBuilder(t *testing.T) {
 	tb.PutString(10, "123")
 	tb.PutByteString(11, []byte("abc"))
 
-	tup, err := tb.Build(testPool)
+	tup, err := tb.Build(context.Background(), testPool)
 	assert.NoError(t, err)
 	i8, ok := desc.GetInt8(0, tup)
 	assert.True(t, ok)
@@ -165,7 +165,7 @@ func testRoundTripInts(t *testing.T) {
 		for idx, value := range test.data {
 			bld.PutInt64(idx, value)
 		}
-		tup, err := bld.Build(testPool)
+		tup, err := bld.Build(context.Background(), testPool)
 		assert.NoError(t, err)
 
 		// verify
@@ -303,7 +303,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 
 		err := tb.PutAdaptiveJsonFromInline(ctx, 0, smallJson)
 		require.NoError(t, err)
-		tup, err := tb.Build(testPool)
+		tup, err := tb.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		result, ok, err := td.GetJsonAdaptiveValue(ctx, 0, vs, tup)
@@ -328,7 +328,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 		storage := NewJsonStorageOutOfBand(h, vs, int64(len(largeJson)))
 		tb.PutAdaptiveJsonFromOutline(0, storage)
 
-		tup, err := tb.Build(testPool)
+		tup, err := tb.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		result, ok, err := td.GetJsonAdaptiveValue(ctx, 0, vs, tup)
@@ -355,7 +355,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 		err = tb.PutAdaptiveJsonFromInline(ctx, 1, largeJson)
 		require.NoError(t, err)
 
-		tup, err := tb.Build(testPool)
+		tup, err := tb.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		// Column 0 (small) should stay inline.
@@ -388,7 +388,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 		tb := NewTupleBuilder(td, vs)
 
 		// Don't write any value – the field should be NULL.
-		tup, err := tb.Build(testPool)
+		tup, err := tb.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		result, ok, err := td.GetJsonAdaptiveValue(ctx, 0, vs, tup)
@@ -405,7 +405,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 
 		err := tb.PutAdaptiveJsonFromInline(ctx, 0, largeJson)
 		require.NoError(t, err)
-		tup, err := tb.Build(testPool)
+		tup, err := tb.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		result, ok, err := td.GetJsonAdaptiveValue(ctx, 0, vs, tup)
@@ -433,7 +433,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 
 		err := tb.PutAdaptiveJsonFromInline(ctx, 0, largeJson)
 		require.NoError(t, err)
-		tup, err := tb.Build(testPool)
+		tup, err := tb.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		outOfBandResult, ok, err := td.GetJsonAdaptiveValue(ctx, 0, vs, tup)
@@ -446,7 +446,7 @@ func TestTupleBuilderJsonAdaptiveEncoding(t *testing.T) {
 		// Put the out-of-band JsonStorage back into a new tuple (pass-through).
 		tb2 := NewTupleBuilder(td, vs)
 		tb2.PutAdaptiveJsonFromOutline(0, outOfBandResult.(*JsonAdaptiveStorage))
-		tup2, err := tb2.Build(testPool)
+		tup2, err := tb2.Build(context.Background(), testPool)
 		require.NoError(t, err)
 
 		// The value should still be readable after the pass-through.
@@ -476,7 +476,7 @@ func TestTupleBuilderAdaptiveEncodings(t *testing.T) {
 			shortByteArray := make([]byte, DefaultTupleLengthTarget/2)
 			err := tb.PutAdaptiveBytesFromInline(ctx, 0, shortByteArray)
 			require.NoError(t, err)
-			tup, err := tb.Build(testPool)
+			tup, err := tb.Build(context.Background(), testPool)
 			require.NoError(t, err)
 
 			adaptiveEncodingBytes, _, err := td.GetBytesAdaptiveValue(ctx, 0, vs, tup)
@@ -491,7 +491,7 @@ func TestTupleBuilderAdaptiveEncodings(t *testing.T) {
 			byteArray := NewByteArray(ctx, h, vs).WithMaxByteLength(int64(len(longByteArray)))
 			tb.PutAdaptiveBytesFromOutline(0, byteArray)
 
-			tup, err := tb.Build(testPool)
+			tup, err := tb.Build(context.Background(), testPool)
 			require.NoError(t, err)
 
 			adaptiveEncodingBytes, _, err := td.GetBytesAdaptiveValue(ctx, 0, vs, tup)
@@ -523,7 +523,7 @@ func TestTupleBuilderAdaptiveEncodings(t *testing.T) {
 			err = tb.PutAdaptiveBytesFromInline(ctx, 1, mediumByteArray)
 			require.NoError(t, err)
 
-			tup, err := tb.Build(testPool)
+			tup, err := tb.Build(context.Background(), testPool)
 			require.NoError(t, err)
 
 			{
@@ -557,7 +557,7 @@ func TestTupleBuilderAdaptiveEncodings(t *testing.T) {
 			err = tb.PutAdaptiveBytesFromInline(ctx, 1, largeByteArray)
 			require.NoError(t, err)
 
-			tup, err := tb.Build(testPool)
+			tup, err := tb.Build(context.Background(), testPool)
 			require.NoError(t, err)
 
 			{
@@ -609,7 +609,7 @@ func TestTupleBuilderAdaptiveEncodings(t *testing.T) {
 			err = tb.PutAdaptiveBytesFromInline(ctx, 2, largeByteArray)
 			require.NoError(t, err)
 
-			tup, err := tb.Build(testPool)
+			tup, err := tb.Build(context.Background(), testPool)
 			require.NoError(t, err)
 
 			{

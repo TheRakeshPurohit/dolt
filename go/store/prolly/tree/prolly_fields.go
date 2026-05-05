@@ -158,7 +158,7 @@ func GetField(ctx context.Context, td *val.TupleDesc, i int, tup val.Tuple, ns N
 	case val.BytesAdaptiveEnc:
 		v, ok, err = td.GetBytesAdaptiveValue(ctx, i, ns, tup)
 	case val.StringAdaptiveEnc:
-		v, ok, err = td.GetStringAdaptiveValue(i, ns, tup)
+		v, ok, err = td.GetStringAdaptiveValue(ctx, i, ns, tup)
 	case val.CommitAddrEnc:
 		v, ok = td.GetCommitAddr(i, tup)
 	case val.CellEnc:
@@ -403,7 +403,7 @@ func Serialize(ctx context.Context, ns NodeStore, t val.Type, v interface{}) (re
 	if err != nil {
 		return nil, err
 	}
-	tup, err := tb.Build(pool.NewBuffPool())
+	tup, err := tb.Build(ctx, pool.NewBuffPool())
 	if err != nil {
 		return nil, err
 	}

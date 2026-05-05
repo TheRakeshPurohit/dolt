@@ -357,14 +357,14 @@ func newTree(t *testing.T, ns NodeStore, keyCnt, blobLen, chunkSize int) *Node {
 	var err error
 	for i := range tuples {
 		keyBld.PutUint32(0, uint32(i))
-		tuples[i][0], err = keyBld.Build(sharedPool)
+		tuples[i][0], err = keyBld.Build(context.Background(), sharedPool)
 		if err != nil {
 			panic(err)
 		}
 
 		addr := mustNewBlob(ctx, ns, blobLen, chunkSize)
 		valBld.PutBytesAddr(0, addr)
-		tuples[i][1], err = valBld.Build(sharedPool)
+		tuples[i][1], err = valBld.Build(context.Background(), sharedPool)
 		if err != nil {
 			panic(err)
 		}

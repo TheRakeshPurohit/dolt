@@ -608,7 +608,7 @@ func (i *nonCoveringMapIter) Next(ctx context.Context) (val.Tuple, val.Tuple, er
 		from := i.pkMap.MapOrdinal(to)
 		i.pkBld.PutRaw(to, idxKey.GetField(from))
 	}
-	pk, err := i.pkBld.Build(sharePool)
+	pk, err := i.pkBld.Build(ctx, sharePool)
 	if err != nil {
 		return nil, nil, err
 	}
