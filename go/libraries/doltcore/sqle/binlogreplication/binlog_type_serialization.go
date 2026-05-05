@@ -55,14 +55,6 @@ func unwrapToBytes(ctx context.Context, value interface{}, typ sql.Type, ns tree
 			return []byte{}, nil
 		}
 		return ns.ReadBytes(ctx, v)
-	case *val.TextStorage:
-		return v.GetBytes(ctx)
-	case *val.ByteArray:
-		return v.ToBytes(ctx)
-	case gmstypes.JSONBytes:
-		// JSONBytes is implemented by IndexedJsonDocument and *val.JsonAdaptiveStorage;
-		// returning the raw JSON bytes avoids a deserialize/reserialize round trip.
-		return v.GetBytes(ctx)
 	case sql.JSONWrapper:
 		// Catches LazyJSONDocument and any other JSONWrapper that doesn't expose raw bytes.
 		return gmstypes.MarshallJson(ctx, v)
@@ -1131,30 +1123,12 @@ func (g geometrySerializer) serialize(ctx context.Context, typ sql.Type, value i
 		return nil, nil
 	}
 
-	// For adaptively-encoded geometry columns stored out of band, tree.GetField returns
-	// a *val.GeometryStorage wrapper. Unwrap it into the raw WKB bytes here, since
-	// types.Geometry.Convert does not know how to handle the wrapper.
-	if storage, ok := value.(*val.GeometryStorage); ok {
-		bytes, err := storage.GetSerializedBytes(ctx)
-		if err != nil {
-			return nil, err
-		}
-		return appendGeometryWithLengthPrefix(bytes), nil
-	}
-
-	geometry, _, err := typ.Convert(ctx, value)
+	geom, err := gmstypes.UnwrapGeometry(ctx, value)
 	if err != nil {
 		return nil, err
 	}
 
-	if geometry == nil {
-		return nil, nil
-	}
-	geoType, ok := geometry.(gmstypes.GeometryValue)
-	if !ok {
-		return nil, fmt.Errorf("expected GeometryValue, got %T", geometry)
-	}
-	return appendGeometryWithLengthPrefix(geoType.Serialize()), nil
+	return appendGeometryWithLengthPrefix(geom.Serialize()), nil
 }
 
 // appendGeometryWithLengthPrefix prefixes the given geometry bytes with their 4-byte
