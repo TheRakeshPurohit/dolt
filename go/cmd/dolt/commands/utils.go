@@ -598,7 +598,7 @@ func PrintCommitInfo(pager *outputpager.Pager, minParents int, showParents, show
 	pager.Writer.Write([]byte(color.YellowString("commit %s ", chStr))) // Use Dim Yellow (33m)
 
 	// Show decoration
-	if decoration != "no" {
+	if decoration != cli.DecorateNo {
 		printRefs(pager, comm, decoration)
 	}
 
@@ -637,7 +637,7 @@ func printRefs(pager *outputpager.Pager, comm *CommitInfo, decoration string) {
 	references := []string{}
 
 	for _, b := range comm.localBranchNames {
-		if decoration == "full" {
+		if decoration == cli.DecorateFull {
 			b = "refs/heads/" + b
 		}
 		// branch names are bright green (32;1m)
@@ -645,7 +645,7 @@ func printRefs(pager *outputpager.Pager, comm *CommitInfo, decoration string) {
 		references = append(references, branchName)
 	}
 	for _, b := range comm.remoteBranchNames {
-		if decoration == "full" {
+		if decoration == cli.DecorateFull {
 			b = "refs/remotes/" + b
 		}
 		// remote names are bright red (31;1m)
@@ -653,7 +653,7 @@ func printRefs(pager *outputpager.Pager, comm *CommitInfo, decoration string) {
 		references = append(references, branchName)
 	}
 	for _, t := range comm.tagNames {
-		if decoration == "full" {
+		if decoration == cli.DecorateFull {
 			t = "refs/tags/" + t
 		}
 		// tag names are bright yellow (33;1m)

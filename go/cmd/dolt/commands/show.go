@@ -289,7 +289,7 @@ func (cmd ShowCmd) validateArgs(apr *argparser.ArgParseResults) errhand.VerboseE
 
 func parseShowArgs(apr *argparser.ArgParseResults) (*showOpts, error) {
 
-	decorateOption := apr.GetValueOrDefault(cli.DecorateFlag, "auto")
+	decorateOption := apr.GetValueOrDefault(cli.DecorateFlag, cli.DecorateAuto)
 	if err := cli.ValidateDecorateOption(decorateOption); err != nil {
 		return nil, fmt.Errorf("fatal: %v", err)
 	}

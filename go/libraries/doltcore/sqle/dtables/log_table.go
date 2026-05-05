@@ -23,6 +23,7 @@ import (
 	"github.com/dolthub/go-mysql-server/sql"
 	"github.com/dolthub/go-mysql-server/sql/types"
 
+	"github.com/dolthub/dolt/go/cmd/dolt/cli"
 	"github.com/dolthub/dolt/go/libraries/doltcore/doltdb"
 	"github.com/dolthub/dolt/go/libraries/doltcore/env/actions/commitwalk"
 	"github.com/dolthub/dolt/go/libraries/doltcore/schema"
@@ -45,6 +46,7 @@ type LogTable struct {
 	headHash          hash.Hash
 	refs              *refsCache
 	projectedCols     []string
+	schema            sql.Schema
 }
 
 // refsCache holds the commit-hash-to-refs map shared by every iterator a LogTable spawns.
@@ -112,22 +114,41 @@ func LogRowOptionsFromProjection(projected []string) LogRowOptions {
 	return opts
 }
 
-var logSchemaCommitterColumns = sql.Schema{
+// LogTableSchema is the dolt_log column shape shared by the system table and the
+// dolt_log() table function. Source and DatabaseSource are left unset so multi-database
+// servers can stamp them per instance via NewLogTableSchema. The parents and signature
+// columns are nullable because they are populated only when explicitly requested.
+var LogTableSchema = sql.Schema{
 	&sql.Column{Name: "commit_hash", Type: types.Text, PrimaryKey: true},
 	&sql.Column{Name: "committer", Type: types.Text},
 	&sql.Column{Name: "email", Type: types.Text},
 	&sql.Column{Name: "date", Type: types.Datetime3},
 	&sql.Column{Name: "message", Type: types.Text},
 	&sql.Column{Name: "commit_order", Type: types.Uint64},
-}
-
-var logSchemaAuthorColumns = sql.Schema{
+	&sql.Column{Name: "parents", Type: types.Text, Nullable: true},
+	&sql.Column{Name: "refs", Type: types.Text},
+	&sql.Column{Name: "signature", Type: types.Text, Nullable: true},
 	&sql.Column{Name: "author", Type: types.Text},
 	&sql.Column{Name: "author_email", Type: types.Text},
 	&sql.Column{Name: "author_date", Type: types.Datetime3},
 }
 
-// NewLogTable creates a LogTable
+// NewLogTableSchema returns LogTableSchema cloned with each column's Source and
+// DatabaseSource set to |tableName| and |dbName|, so the SQL planner can disambiguate
+// columns that belong to different databases on the same server.
+func NewLogTableSchema(dbName, tableName string) sql.Schema {
+	sch := make(sql.Schema, len(LogTableSchema))
+	for i, col := range LogTableSchema {
+		c := *col
+		c.Source = tableName
+		c.DatabaseSource = dbName
+		sch[i] = &c
+	}
+	return sch
+}
+
+// NewLogTable creates a LogTable. The per-instance schema is built once at construction
+// so each Schema call is a single field read instead of recomputing on every query.
 func NewLogTable(ctx *sql.Context, dbName, tableName string, ddb *doltdb.DoltDB, head *doltdb.Commit) sql.Table {
 	return &LogTable{
 		dbName:    dbName,
@@ -135,6 +156,7 @@ func NewLogTable(ctx *sql.Context, dbName, tableName string, ddb *doltdb.DoltDB,
 		ddb:       ddb,
 		head:      head,
 		refs:      &refsCache{},
+		schema:    NewLogTableSchema(dbName, tableName),
 	}
 }
 
@@ -170,19 +192,6 @@ func (dt *LogTable) Name() string {
 // String is a sql.Table interface function which returns the name of the table
 func (dt *LogTable) String() string {
 	return dt.tableName
-}
-
-// NewLogTableSchema returns the dolt_log schema shared by the system table and the dolt_log() table function.
-func NewLogTableSchema() sql.Schema {
-	var cols sql.Schema
-	cols = append(cols, logSchemaCommitterColumns...)
-	cols = append(cols,
-		&sql.Column{Name: "parents", Type: types.Text, Nullable: true},
-		&sql.Column{Name: "refs", Type: types.Text},
-		&sql.Column{Name: "signature", Type: types.Text, Nullable: true},
-	)
-	cols = append(cols, logSchemaAuthorColumns...)
-	return cols
 }
 
 // BuildLogTableRow builds a dolt_log row for |commit| at |height|, formatting the refs column
@@ -245,12 +254,7 @@ func BuildLogTableRow(ctx *sql.Context, commit *doltdb.Commit, meta *datas.Commi
 
 // Schema is a sql.Table interface function that gets the sql.Schema of the log system table.
 func (dt *LogTable) Schema(_ *sql.Context) sql.Schema {
-	sch := NewLogTableSchema()
-	for _, col := range sch {
-		col.Source = dt.tableName
-		col.DatabaseSource = dt.dbName
-	}
-	return sch
+	return dt.schema
 }
 
 // Collation implements the sql.Table interface.
@@ -300,7 +304,7 @@ func (dt *LogTable) getCachedRefs(ctx *sql.Context) (map[hash.Hash][]string, err
 	if m := dt.refs.load(); m != nil {
 		return m, nil
 	}
-	m, err := GetCommitHashToRefs(ctx, dt.ddb, "short")
+	m, err := GetCommitHashToRefs(ctx, dt.ddb, cli.DecorateShort)
 	if err != nil {
 		return nil, err
 	}
@@ -467,7 +471,7 @@ func (itr *LogItr) Close(*sql.Context) error {
 // calling because this function has no tty signal of its own.
 func GetCommitHashToRefs(ctx *sql.Context, ddb *doltdb.DoltDB, decoration string) (map[hash.Hash][]string, error) {
 	cHashToRefs := map[hash.Hash][]string{}
-	if decoration == "no" {
+	if decoration == cli.DecorateNo {
 		return cHashToRefs, nil
 	}
 
@@ -477,7 +481,7 @@ func GetCommitHashToRefs(ctx *sql.Context, ddb *doltdb.DoltDB, decoration string
 	}
 	for _, b := range branches {
 		refName := b.Ref.String()
-		if decoration != "full" {
+		if decoration != cli.DecorateFull {
 			refName = b.Ref.GetPath()
 		}
 		cHashToRefs[b.Hash] = append(cHashToRefs[b.Hash], refName)
@@ -489,7 +493,7 @@ func GetCommitHashToRefs(ctx *sql.Context, ddb *doltdb.DoltDB, decoration string
 	}
 	for _, r := range remotes {
 		refName := r.Ref.String()
-		if decoration != "full" {
+		if decoration != cli.DecorateFull {
 			refName = r.Ref.GetPath()
 		}
 		cHashToRefs[r.Hash] = append(cHashToRefs[r.Hash], refName)
@@ -501,7 +505,7 @@ func GetCommitHashToRefs(ctx *sql.Context, ddb *doltdb.DoltDB, decoration string
 	}
 	for _, t := range tags {
 		tagName := t.Ref.String()
-		if decoration != "full" {
+		if decoration != cli.DecorateFull {
 			tagName = t.Ref.GetPath()
 		}
 		tagName = fmt.Sprintf("tag: %s", tagName)

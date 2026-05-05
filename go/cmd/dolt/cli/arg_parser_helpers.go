@@ -316,13 +316,21 @@ func CreateLogArgParser(isTableFunction bool) *argparser.ArgParser {
 	return ap
 }
 
-// ValidateDecorateOption returns nil when |value| is one of the values accepted by the
-// --decorate flag. "short" trims ref prefixes; "full" keeps refs/heads/, refs/remotes/,
-// and refs/tags/; "no" produces an empty refs column; "auto" resolves to "short" on a
-// tty and "no" otherwise.
+// Values accepted by the --decorate flag. DecorateShort trims ref prefixes,
+// DecorateFull keeps refs/heads/, refs/remotes/, and refs/tags/, DecorateNo
+// produces an empty refs column, and DecorateAuto resolves to DecorateShort
+// on a tty and DecorateNo otherwise.
+const (
+	DecorateAuto  = "auto"
+	DecorateShort = "short"
+	DecorateFull  = "full"
+	DecorateNo    = "no"
+)
+
+// ValidateDecorateOption returns nil when |value| is accepted by the --decorate flag.
 func ValidateDecorateOption(value string) error {
 	switch value {
-	case "short", "full", "auto", "no":
+	case DecorateShort, DecorateFull, DecorateAuto, DecorateNo:
 		return nil
 	}
 	return fmt.Errorf("invalid --%s option: %q", DecorateFlag, value)

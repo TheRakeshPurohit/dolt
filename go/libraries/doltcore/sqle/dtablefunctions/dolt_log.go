@@ -144,16 +144,16 @@ func (ltfa *LogTableFunctionArgs) addOptions(ctx *sql.Context, expressions []sql
 	// Default to short so ad-hoc SQL callers see refs without an extra flag. auto has no
 	// defined meaning here because the server has no tty signal, so accept it for back
 	// compatibility with older dolt clients but warn and downgrade to short.
-	ltfa.decoration = apr.GetValueOrDefault(cli.DecorateFlag, "short")
+	ltfa.decoration = apr.GetValueOrDefault(cli.DecorateFlag, cli.DecorateShort)
 	if err := cli.ValidateDecorateOption(ltfa.decoration); err != nil {
 		return sql.ErrInvalidArgumentDetails.New(ltfa.Name(), err.Error())
 	}
-	if ltfa.decoration == "auto" {
+	if ltfa.decoration == cli.DecorateAuto {
 		// Warn only on the execution pass so deferred-parse callers see exactly one warning.
 		if !deferExpressions {
 			ctx.Warn(mysql.ERWarnDeprecatedSyntax, "--%s=auto has no defined meaning in SQL contexts; defaulting to short", cli.DecorateFlag)
 		}
-		ltfa.decoration = "short"
+		ltfa.decoration = cli.DecorateShort
 	}
 
 	// store revision strs directly from cli parse instead of mapping back exprs
@@ -265,7 +265,7 @@ func (ltf *LogTableFunction) getOptionsString() string {
 		options = append(options, fmt.Sprintf("--%s", cli.ParentsFlag))
 	}
 
-	if ltf.decoration != "" && ltf.decoration != "short" {
+	if ltf.decoration != "" && ltf.decoration != cli.DecorateShort {
 		options = append(options, fmt.Sprintf("--%s %s", cli.DecorateFlag, ltf.decoration))
 	}
 
@@ -282,7 +282,7 @@ func (ltf *LogTableFunction) getOptionsString() string {
 
 // Schema implements the sql.Node interface.
 func (ltf *LogTableFunction) Schema(_ *sql.Context) sql.Schema {
-	return dtables.NewLogTableSchema()
+	return dtables.LogTableSchema
 }
 
 // Children implements the sql.Node interface.

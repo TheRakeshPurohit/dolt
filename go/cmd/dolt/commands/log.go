@@ -314,20 +314,20 @@ func logCommits(apr *argparser.ArgParseResults, commitHashes []sql.Row, queryist
 	// Resolve auto before opening the pager. checkIsTerminal uses ExecuteWithStdioRestored,
 	// which mutates os.Stdout, and the pager block calls ExecuteWithStdioRestored too.
 	// Calling it from inside the pager block leaves the pager holding a stale stdout handle.
-	decoration := resolveDecorateAuto(apr.GetValueOrDefault(cli.DecorateFlag, "auto"))
+	decoration := resolveDecorateAuto(apr.GetValueOrDefault(cli.DecorateFlag, cli.DecorateAuto))
 	return logToStdOut(apr, commitsInfo, sqlCtx, queryist, decoration)
 }
 
-// resolveDecorateAuto returns short when stdout is a terminal and no
+// resolveDecorateAuto returns DecorateShort when stdout is a terminal and DecorateNo
 // otherwise. Other |decorate| values pass through unchanged.
 func resolveDecorateAuto(decorate string) string {
-	if decorate != "auto" {
+	if decorate != cli.DecorateAuto {
 		return decorate
 	}
 	if checkIsTerminal() {
-		return "short"
+		return cli.DecorateShort
 	}
-	return "no"
+	return cli.DecorateNo
 }
 
 func logCompact(pager *outputpager.Pager, apr *argparser.ArgParseResults, commits []CommitInfo, sqlCtx *sql.Context, queryist cli.Queryist, decoration string) error {
@@ -348,7 +348,7 @@ func logCompact(pager *outputpager.Pager, apr *argparser.ArgParseResults, commit
 		// Write commit hash
 		pager.Writer.Write([]byte(color.YellowString("%s ", chStr)))
 
-		if decoration != "no" {
+		if decoration != cli.DecorateNo {
 			printRefs(pager, &comm, decoration)
 		}
 
