@@ -81,18 +81,20 @@ func doDoltRm(ctx *sql.Context, args []string) (int, error) {
 		return 1, err
 	}
 
-	roots.Staged, err = roots.Staged.RemoveTables(ctx, false, false, verifiedTables...)
+	staged, err := roots.Staged.RemoveTables(ctx, false, false, verifiedTables...)
 	if err != nil {
 		return 1, err
 	}
+	roots.Staged = staged
 
 	// The staged root check above does not validate FK constraints that only exist in
 	// the working set, so the working set must also be checked.
 	if !checkStaged {
-		roots.Working, err = roots.Working.RemoveTables(ctx, false, false, verifiedTables...)
+		working, err := roots.Working.RemoveTables(ctx, false, false, verifiedTables...)
 		if err != nil {
 			return 1, err
 		}
+		roots.Working = working
 	} else {
 		// With |--cached|, a table may already be absent from working (for example
 		// after a DROP TABLE), so only tables present in working are passed to the FK check.
